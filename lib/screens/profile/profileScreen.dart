@@ -1,15 +1,13 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:iqfence/components/custom_appbar.dart';
+import 'package:iqfence/providers/profileProvider.dart';
 import 'package:iqfence/screens/opening/hello_screen.dart';
 import 'package:iqfence/screens/profile/editProfileScreen.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import '../../providers/Auth.dart';
-import 'package:iqfence/providers/profileProvider.dart';
-import 'package:iqfence/components/custom_appbar.dart';
 import 'package:provider/provider.dart';
 
-
-
+import '../../providers/Auth.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -53,6 +51,13 @@ class ProfileScreen extends StatelessWidget {
     final user = FirebaseAuth.instance.currentUser;
     final profile = Provider.of<ProfileProvider>(context, listen: false);
 
+    // Check if user is null (not logged in)
+    if (user == null) {
+      return const Scaffold(
+        body: Center(child: Text('No user logged in')),
+      );
+    }
+
     return Scaffold(
       appBar: const CustomAppBar(),
       body: Padding(
@@ -60,20 +65,25 @@ class ProfileScreen extends StatelessWidget {
         child: StreamBuilder<DocumentSnapshot>(
           stream: FirebaseFirestore.instance
               .collection('users')
-              .doc(user?.uid)
+              .doc(user.uid)
               .snapshots(),
           builder:
               (BuildContext context, AsyncSnapshot<DocumentSnapshot> snapshot) {
             if (snapshot.hasError) {
-              return const Text('Something went wrong');
+              return const Center(child: Text('Something went wrong'));
             }
 
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
             }
 
+            if (!snapshot.hasData || !snapshot.data!.exists) {
+              return const Center(child: Text('User data not found'));
+            }
+
             Map<String, dynamic> data =
                 snapshot.data!.data() as Map<String, dynamic>;
+
             return Column(
               children: [
                 const SizedBox(height: 20),
@@ -103,7 +113,7 @@ class ProfileScreen extends StatelessWidget {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => EditProfileScreen(),
+                              builder: (context) => const EditProfileScreen(),
                             ),
                           );
                         },
@@ -113,7 +123,7 @@ class ProfileScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 20),
                 Text(
-                  data['displayName'],
+                  data['displayName'] ?? 'No Name',
                   style: const TextStyle(
                     fontSize: 22.0,
                     fontWeight: FontWeight.bold,
@@ -121,7 +131,7 @@ class ProfileScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  user?.email ?? 'No email',
+                  user.email ?? 'No email',
                   style: const TextStyle(
                     fontSize: 18.0,
                   ),
@@ -135,12 +145,13 @@ class ProfileScreen extends StatelessWidget {
                   child: ListTile(
                     leading: Image.asset('assets/people.png'),
                     title: const Text('Ubah Informasi Profil'),
-                    trailing: const Icon(Icons.arrow_forward_ios, color: Colors.blue),
+                    trailing:
+                        const Icon(Icons.arrow_forward_ios, color: Colors.blue),
                     onTap: () {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => EditProfileScreen(),
+                          builder: (context) => const EditProfileScreen(),
                         ),
                       );
                     },
@@ -155,7 +166,8 @@ class ProfileScreen extends StatelessWidget {
                   child: ListTile(
                     leading: Image.asset('assets/logout.png'),
                     title: const Text('Keluar dari Akun'),
-                    trailing: const Icon(Icons.arrow_forward_ios, color: Colors.blue),
+                    trailing:
+                        const Icon(Icons.arrow_forward_ios, color: Colors.blue),
                     onTap: () {
                       _showLogoutDialog(context, auth);
                     },

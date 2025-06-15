@@ -43,6 +43,7 @@ dependencies:
   lucide_icons: ^0.257.0
   path_provider: ^2.1.4
   permission_handler: ^11.3.1
+  intl: ^0.19.0
   
 
 dev_dependencies:
@@ -71,6 +72,11 @@ flutter:
   # To add assets to your application, add an assets section, like this:
   assets:
     - assets/
+    - assets/mainlogobiru.png
+    - assets/people.png
+    - assets/logout.png
+    - assets/edit.png
+    - assets/indonesian_flag.png
     - assets/karyawan/
     - assets/placeholder.png
 

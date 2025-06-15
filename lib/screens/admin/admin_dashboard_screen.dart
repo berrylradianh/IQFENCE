@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:iqfence/screens/admin/izin/kelola_izin_screen.dart';
 import 'package:iqfence/screens/admin/lokasi/kelola_lokasi_screen.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
@@ -91,7 +92,13 @@ class AdminDashboardScreen extends StatelessWidget {
                     icon: LucideIcons.fileClock,
                     title: "Kelola Izin",
                     color: Colors.amber[700]!,
-                    onTap: () {},
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const KelolaIzinScreen()),
+                      );
+                    },
                   ),
                   _DashboardMenuItem(
                     icon: LucideIcons.mapPin,

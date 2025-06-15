@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:iqfence/screens/admin/admin_dashboard_screen.dart';
 import 'package:iqfence/screens/admin/karyawan/kelola_karyawan_screen.dart';
+import 'package:iqfence/screens/profile/profileScreen.dart';
 
 class BottomnavbarScreen extends StatefulWidget {
   final bool isAdmin;
@@ -21,7 +22,7 @@ class _BottomnavbarScreenState extends State<BottomnavbarScreen> {
       case 1:
         return const KelolaKaryawanScreen();
       case 2:
-        return const Center(child: Text('Halaman Profil'));
+        return const ProfileScreen();
       default:
         return const Center(child: Text('Halaman Tidak Ditemukan'));
     }

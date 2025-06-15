@@ -12,6 +12,7 @@ class CustomTextField extends StatelessWidget {
     this.isPassword = false,
     this.isPhone = false,
     this.enabled = true,
+    this.keyboardType,
   });
 
   final TextEditingController controller;
@@ -20,6 +21,7 @@ class CustomTextField extends StatelessWidget {
   final bool isPassword;
   final bool isPhone;
   final bool enabled;
+  final TextInputType? keyboardType;
 
   @override
   Widget build(BuildContext context) {
@@ -40,6 +42,7 @@ class CustomTextField extends StatelessWidget {
               enabled: enabled,
               controller: controller,
               obscureText: value.isPasswordVisible && isPassword,
+              keyboardType: keyboardType,
               decoration: InputDecoration(
                 hintText: hintText,
                 border: OutlineInputBorder(
@@ -56,28 +59,32 @@ class CustomTextField extends StatelessWidget {
                       )
                     : null,
                 prefixIcon: isPhone
-                    ? Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          //flag image
-                          Image.asset(
-                            'assets/Indonesia_flag.png',
-                          ),
-                          const Text(
-                            '+62',
-                            style: TextStyle(
-                              fontSize: 14.0,
-                              fontWeight: FontWeight.w600,
+                    ? SizedBox(
+                        width: 80, // Adjust this value based on your needs
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Image.asset(
+                              'assets/indonesian_flag.png',
+                              width: 24, // Constrain image size
+                              height: 24,
                             ),
-                          ),
-                          const SizedBox(width: 10),
-                          Container(
-                            width: 1,
-                            height: 20,
-                            color: Colors.grey,
-                          ),
-                          const SizedBox(width: 10),
-                        ],
+                            const Text(
+                              '+62',
+                              style: TextStyle(
+                                fontSize: 14.0,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(width: 5), // Reduce spacing
+                            Container(
+                              width: 1,
+                              height: 20,
+                              color: Colors.grey,
+                            ),
+                            const SizedBox(width: 5), // Reduce spacing
+                          ],
+                        ),
                       )
                     : null,
               ),
