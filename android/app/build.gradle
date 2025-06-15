@@ -1,0 +1,72 @@
+plugins {
+    id "com.android.application"
+    id "kotlin-android"
+    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
+    id "dev.flutter.flutter-gradle-plugin"
+    id "com.google.gms.google-services" // Keep only in plugins block
+}
+
+dependencies {
+    // Import the Firebase BoM
+    implementation platform('com.google.firebase:firebase-bom:33.5.0')
+
+    // Firebase dependencies (no versions needed when using BoM)
+    implementation "com.google.firebase:firebase-analytics"
+    implementation "com.google.firebase:firebase-auth"
+    implementation "com.google.firebase:firebase-database"
+    implementation "com.google.firebase:firebase-firestore"
+    implementation "com.google.firebase:firebase-storage"
+
+    // Kotlin standard library
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:1.8.10"
+}
+apply plugin: 'com.android.application'
+apply plugin: 'kotlin-android'
+apply plugin: 'com.google.gms.google-services'
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withReader("UTF-8") { reader ->
+        localProperties.load(reader)
+    }
+}
+
+def flutterVersionCode = localProperties.getProperty("flutter.versionCode") ?: "1"
+def flutterVersionName = localProperties.getProperty("flutter.versionName") ?: "1.0"
+
+android {
+    namespace = "com.iqutta.iqfence" // Updated to match AndroidManifest.xml
+    compileSdk = 35
+    ndkVersion = flutter.ndkVersion
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
+    }
+    kotlinOptions {
+        jvmTarget = '1.8'
+    }
+
+    defaultConfig {
+        applicationId "com.iqutta.iqfence"
+        minSdkVersion 23
+        targetSdkVersion 35
+        versionCode 1
+        versionName "1.0"
+    }
+
+    buildTypes {
+        release {
+            // TODO: Add your own signing config for the release build.
+            // Signing with the debug keys for now, so `flutter run --release` works.
+            signingConfig = signingConfigs.debug
+        }
+        debug {
+            manifestPlaceholders = [versionCode: "1", versionName: "1.0"]
+        }
+    }
+}
+
+flutter {
+    source = "../.."
+}

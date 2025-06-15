@@ -1,0 +1,49 @@
+{
+  "project_info": {
+    "project_number": "412840461291",
+    "firebase_url": "https://iqfence-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "iqfence",
+    "storage_bucket": "iqfence.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:412840461291:android:c21d778c2f4ace14ca8fae",
+        "android_client_info": {
+          "package_name": "com.example.iqfence"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDB1BWcnBiDbtg29w1zGPejOJ53XugXyHc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:412840461291:android:cfb6ba0515b7ac0cca8fae",
+        "android_client_info": {
+          "package_name": "com.iqutta.iqfence"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDB1BWcnBiDbtg29w1zGPejOJ53XugXyHc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
