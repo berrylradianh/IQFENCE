@@ -1,17 +1,17 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:iqfence/screens/admin/izin/tambah_izin_screen.dart';
+import 'package:iqfence/screens/admin/lembur/tambah_lembur_screen.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
-class KelolaIzinScreen extends StatefulWidget {
-  const KelolaIzinScreen({super.key});
+class KelolaLemburScreen extends StatefulWidget {
+  const KelolaLemburScreen({super.key});
 
   @override
-  State<KelolaIzinScreen> createState() => _KelolaIzinScreenState();
+  State<KelolaLemburScreen> createState() => _KelolaLemburScreenState();
 }
 
-class _KelolaIzinScreenState extends State<KelolaIzinScreen>
+class _KelolaLemburScreenState extends State<KelolaLemburScreen>
     with SingleTickerProviderStateMixin {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
@@ -36,9 +36,9 @@ class _KelolaIzinScreenState extends State<KelolaIzinScreen>
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),
-        title: Text('Konfirmasi $action Izin?'),
+        title: Text('Konfirmasi $action Lembur?'),
         content: Text(
-          'Anda akan $action izin karyawan ini.',
+          'Anda akan $action lembur karyawan ini.',
         ),
         actions: [
           TextButton(
@@ -60,13 +60,13 @@ class _KelolaIzinScreenState extends State<KelolaIzinScreen>
     );
   }
 
-  Future<void> _updateIzinStatus(
+  Future<void> _updateLemburStatus(
       BuildContext context, String docId, String status) async {
     try {
       await FirebaseFirestore.instance
-          .collection('izin')
+          .collection('lembur')
           .doc(docId)
-          .update({'statusIzin': status});
+          .update({'statusLembur': status});
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Diizinkan berhasil $status')),
       );
@@ -87,9 +87,9 @@ class _KelolaIzinScreenState extends State<KelolaIzinScreen>
   String _formatDate(dynamic date) {
     try {
       if (date is Timestamp) {
-        return DateFormat('dd MMM yyyy').format(date.toDate());
+        return DateFormat('dd MMM yyyy HH:mm').format(date.toDate());
       } else if (date is String) {
-        return DateFormat('dd MMM yyyy').format(DateTime.parse(date));
+        return DateFormat('dd MMM yyyy HH:mm').format(DateTime.parse(date));
       }
       return 'No tanggal';
     } catch (e) {
@@ -104,7 +104,7 @@ class _KelolaIzinScreenState extends State<KelolaIzinScreen>
       child: Scaffold(
         backgroundColor: Colors.white,
         appBar: AppBar(
-          title: const Text('Kelola Izin Karyawan'),
+          title: const Text('Kelola Lembur Karyawan'),
           backgroundColor: Colors.white,
           foregroundColor: Colors.black,
           elevation: 0,
@@ -152,7 +152,7 @@ class _KelolaIzinScreenState extends State<KelolaIzinScreen>
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => const TambahIzinScreen(),
+                          builder: (context) => const TambahLemburScreen(),
                         ),
                       );
                     },
@@ -178,8 +178,8 @@ class _KelolaIzinScreenState extends State<KelolaIzinScreen>
                     // Aktif Tab
                     StreamBuilder<QuerySnapshot>(
                       stream: FirebaseFirestore.instance
-                          .collection('izin')
-                          .where('statusIzin', isEqualTo: 'Aktif')
+                          .collection('lembur')
+                          .where('statusLembur', isEqualTo: 'Aktif')
                           .snapshots(),
                       builder: (context, snapshot) {
                         if (snapshot.connectionState ==
@@ -193,38 +193,39 @@ class _KelolaIzinScreenState extends State<KelolaIzinScreen>
                         }
                         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                           return const Center(
-                              child: Text('Tidak ada izin aktif'));
+                              child: Text('Tidak ada lembur aktif'));
                         }
 
-                        final izinDocs = snapshot.data!.docs.where((doc) {
-                          final izin = doc.data() as Map<String, dynamic>;
+                        final lemburDocs = snapshot.data!.docs.where((doc) {
+                          final lembur = doc.data() as Map<String, dynamic>;
                           final nama =
-                              (izin['userData']['nama'] ?? '').toLowerCase();
+                              (lembur['userData']['nama'] ?? '').toLowerCase();
                           return nama.contains(_searchQuery);
                         }).toList();
 
-                        if (izinDocs.isEmpty && _searchQuery.isNotEmpty) {
+                        if (lemburDocs.isEmpty && _searchQuery.isNotEmpty) {
                           return const Center(
                               child: Text('Tidak ada karyawan yang cocok'));
                         }
 
                         return ListView.builder(
-                          itemCount: izinDocs.length,
+                          itemCount: lemburDocs.length,
                           itemBuilder: (context, index) {
-                            final doc = izinDocs[index];
-                            final izin = doc.data() as Map<String, dynamic>;
+                            final doc = lemburDocs[index];
+                            final lembur = doc.data() as Map<String, dynamic>;
                             final userData =
-                                izin['userData'] as Map<String, dynamic>;
+                                lembur['userData'] as Map<String, dynamic>;
                             final alamat = userData['alamat'] ?? 'No alamat';
                             final nama = userData['nama'] ?? 'No nama';
                             final posisi = userData['posisi'] ?? 'No posisi';
                             final fotoPath =
                                 userData['foto'] ?? 'assets/placeholder.png';
                             final tanggalMulai =
-                                _formatDate(izin['izinStartDate']);
+                                _formatDate(lembur['lemburStartDate']);
                             final tanggalSelesai =
-                                _formatDate(izin['izinEndDate']);
-                            final alasan = izin['izinReason'] ?? 'No alasan';
+                                _formatDate(lembur['lemburEndDate']);
+                            final alasan =
+                                lembur['lemburReason'] ?? 'No alasan';
 
                             return Card(
                               margin: const EdgeInsets.only(bottom: 16),
@@ -298,7 +299,7 @@ class _KelolaIzinScreenState extends State<KelolaIzinScreen>
                                     // [Tanggal Mulai]
                                     Row(
                                       children: [
-                                        const Icon(LucideIcons.calendar,
+                                        const Icon(LucideIcons.clock,
                                             color: Colors.blue, size: 16),
                                         const SizedBox(width: 8),
                                         Text('Mulai: $tanggalMulai',
@@ -310,7 +311,7 @@ class _KelolaIzinScreenState extends State<KelolaIzinScreen>
                                     // [Tanggal Selesai]
                                     Row(
                                       children: [
-                                        const Icon(LucideIcons.calendar,
+                                        const Icon(LucideIcons.clock,
                                             color: Colors.blue, size: 16),
                                         const SizedBox(width: 8),
                                         Text('Selesai: $tanggalSelesai',
@@ -347,7 +348,7 @@ class _KelolaIzinScreenState extends State<KelolaIzinScreen>
                                                 await _showApprovalConfirmationDialog(
                                                     context, 'Dizinkan');
                                             if (confirm == true) {
-                                              await _updateIzinStatus(
+                                              await _updateLemburStatus(
                                                   context, doc.id, 'Diizinkan');
                                             }
                                           },
@@ -374,7 +375,7 @@ class _KelolaIzinScreenState extends State<KelolaIzinScreen>
                                                 await _showApprovalConfirmationDialog(
                                                     context, 'Ditolak');
                                             if (confirm == true) {
-                                              await _updateIzinStatus(
+                                              await _updateLemburStatus(
                                                   context, doc.id, 'Ditolak');
                                             }
                                           },
@@ -407,8 +408,8 @@ class _KelolaIzinScreenState extends State<KelolaIzinScreen>
                     // Selesai Tab
                     StreamBuilder<QuerySnapshot>(
                       stream: FirebaseFirestore.instance
-                          .collection('izin')
-                          .where('statusIzin',
+                          .collection('lembur')
+                          .where('statusLembur',
                               whereIn: ['Diizinkan', 'Ditolak']).snapshots(),
                       builder: (context, snapshot) {
                         if (snapshot.connectionState ==
@@ -422,39 +423,41 @@ class _KelolaIzinScreenState extends State<KelolaIzinScreen>
                         }
                         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                           return const Center(
-                              child: Text('Tidak ada izin selesai'));
+                              child: Text('Tidak ada lembur selesai'));
                         }
 
-                        final izinDocs = snapshot.data!.docs.where((doc) {
-                          final izin = doc.data() as Map<String, dynamic>;
+                        final lemburDocs = snapshot.data!.docs.where((doc) {
+                          final lembur = doc.data() as Map<String, dynamic>;
                           final nama =
-                              (izin['userData']['nama'] ?? '').toLowerCase();
+                              (lembur['userData']['nama'] ?? '').toLowerCase();
                           return nama.contains(_searchQuery);
                         }).toList();
 
-                        if (izinDocs.isEmpty && _searchQuery.isNotEmpty) {
+                        if (lemburDocs.isEmpty && _searchQuery.isNotEmpty) {
                           return const Center(
                               child: Text('Tidak ada karyawan yang cocok'));
                         }
 
                         return ListView.builder(
-                          itemCount: izinDocs.length,
+                          itemCount: lemburDocs.length,
                           itemBuilder: (context, index) {
-                            final doc = izinDocs[index];
-                            final izin = doc.data() as Map<String, dynamic>;
+                            final doc = lemburDocs[index];
+                            final lembur = doc.data() as Map<String, dynamic>;
                             final userData =
-                                izin['userData'] as Map<String, dynamic>;
+                                lembur['userData'] as Map<String, dynamic>;
                             final alamat = userData['alamat'] ?? 'No alamat';
                             final nama = userData['nama'] ?? 'No nama';
                             final posisi = userData['posisi'] ?? 'No posisi';
                             final fotoPath =
                                 userData['foto'] ?? 'assets/placeholder.png';
-                            final statusIzin = izin['statusIzin'] ?? 'Selesai';
+                            final statusLembur =
+                                lembur['statusLembur'] ?? 'Selesai';
                             final tanggalMulai =
-                                _formatDate(izin['izinStartDate']);
+                                _formatDate(lembur['lemburStartDate']);
                             final tanggalSelesai =
-                                _formatDate(izin['izinEndDate']);
-                            final alasan = izin['izinReason'] ?? 'No alasan';
+                                _formatDate(lembur['lemburEndDate']);
+                            final alasan =
+                                lembur['lemburReason'] ?? 'No alasan';
 
                             return Card(
                               margin: const EdgeInsets.only(bottom: 16),
@@ -528,7 +531,7 @@ class _KelolaIzinScreenState extends State<KelolaIzinScreen>
                                     // [Tanggal Mulai]
                                     Row(
                                       children: [
-                                        const Icon(LucideIcons.calendar,
+                                        const Icon(LucideIcons.clock,
                                             color: Colors.blue, size: 16),
                                         const SizedBox(width: 8),
                                         Text('Mulai: $tanggalMulai',
@@ -540,7 +543,7 @@ class _KelolaIzinScreenState extends State<KelolaIzinScreen>
                                     // [Tanggal Selesai]
                                     Row(
                                       children: [
-                                        const Icon(LucideIcons.calendar,
+                                        const Icon(LucideIcons.clock,
                                             color: Colors.blue, size: 16),
                                         const SizedBox(width: 8),
                                         Text('Selesai: $tanggalSelesai',
@@ -576,14 +579,14 @@ class _KelolaIzinScreenState extends State<KelolaIzinScreen>
                                           height: 8,
                                           decoration: BoxDecoration(
                                             shape: BoxShape.circle,
-                                            color: statusIzin == 'Diizinkan'
+                                            color: statusLembur == 'Diizinkan'
                                                 ? Colors.green
                                                 : Colors.red,
                                           ),
                                         ),
                                         const SizedBox(width: 8),
                                         Text(
-                                          statusIzin == 'Diizinkan'
+                                          statusLembur == 'Diizinkan'
                                               ? 'Diizinkan'
                                               : 'Ditolak',
                                           style: const TextStyle(

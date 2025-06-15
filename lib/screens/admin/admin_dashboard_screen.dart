@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:iqfence/screens/admin/izin/kelola_izin_screen.dart';
+import 'package:iqfence/screens/admin/lembur/kelola_lembur_screen.dart';
 import 'package:iqfence/screens/admin/lokasi/kelola_lokasi_screen.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
@@ -123,7 +124,13 @@ class AdminDashboardScreen extends StatelessWidget {
                     title: "Kelola Lembur",
                     color: Colors.amber[700]!,
                     showNotification: true,
-                    onTap: () {},
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const KelolaLemburScreen()),
+                      );
+                    },
                   ),
                 ],
               ),
