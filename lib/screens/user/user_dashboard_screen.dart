@@ -1,13 +1,129 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/date_symbol_data_local.dart'; // Import untuk inisialisasi locale
+import 'package:intl/intl.dart';
+import 'package:iqfence/providers/Auth.dart';
 import 'package:iqfence/screens/admin/izin/kelola_izin_screen.dart';
 import 'package:iqfence/screens/admin/lembur/kelola_lembur_screen.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:provider/provider.dart';
 
-class UserDashboardScreen extends StatelessWidget {
+class UserDashboardScreen extends StatefulWidget {
   const UserDashboardScreen({super.key});
 
   @override
+  State<UserDashboardScreen> createState() => _UserDashboardScreenState();
+}
+
+class _UserDashboardScreenState extends State<UserDashboardScreen> {
+  String? _currentDay;
+  String? _formattedDate;
+  String? _jamKerja;
+  bool _isLibur = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeAndFetchData();
+  }
+
+  Future<void> _initializeAndFetchData() async {
+    // Inisialisasi data locale untuk 'id_ID'
+    await initializeDateFormatting('id_ID');
+    // Panggil fetch data setelah inisialisasi selesai
+    await _fetchJamKerja();
+  }
+
+  Future<void> _fetchJamKerja() async {
+    final auth = Provider.of<Auth>(context, listen: false);
+    final userId = auth.user.uid;
+
+    // Format hari dan tanggal saat ini
+    final now = DateTime.now();
+    final formatter = DateFormat('EEEE, d MMMM yyyy', 'id_ID');
+    final dayFormatter = DateFormat('EEEE', 'id_ID');
+    setState(() {
+      _formattedDate = formatter.format(now);
+      _currentDay = dayFormatter.format(now);
+    });
+
+    print('Current Day: $_currentDay');
+    print('User ID: $userId');
+
+    try {
+      // Ambil karyawan_id dari koleksi users
+      DocumentSnapshot userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .get();
+
+      print('User Doc Exists: ${userDoc.exists}');
+      if (userDoc.exists && userDoc.data() != null) {
+        Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
+        String? karyawanId = userData['karyawan_id'];
+        print('Karyawan ID: $karyawanId');
+
+        if (karyawanId != null) {
+          DocumentSnapshot karyawanDoc = await FirebaseFirestore.instance
+              .collection('karyawan')
+              .doc(karyawanId)
+              .get();
+
+          print('Karyawan Doc Exists: ${karyawanDoc.exists}');
+          if (karyawanDoc.exists && karyawanDoc.data() != null) {
+            Map<String, dynamic> karyawanData =
+                karyawanDoc.data() as Map<String, dynamic>;
+            Map<String, dynamic> jamKerja = karyawanData['jam_kerja'] ?? {};
+            print('Jam Kerja: $jamKerja');
+
+            if (jamKerja[_currentDay] != null) {
+              final hariData = jamKerja[_currentDay];
+              print('Hari Data ($_currentDay): $hariData');
+              setState(() {
+                _isLibur = hariData['libur'] ?? false;
+                if (!_isLibur && hariData['jam_mulai'] != '-') {
+                  _jamKerja =
+                      "${hariData['jam_mulai']} - ${hariData['jam_selesai']}";
+                } else {
+                  _jamKerja = "Hari Libur";
+                }
+              });
+            } else {
+              setState(() {
+                _jamKerja = "Data jam kerja tidak tersedia";
+              });
+            }
+          } else {
+            setState(() {
+              _jamKerja = "Data karyawan tidak ditemukan";
+            });
+          }
+        } else {
+          setState(() {
+            _jamKerja = "Karyawan ID tidak ditemukan";
+          });
+        }
+      } else {
+        setState(() {
+          _jamKerja = "Data pengguna tidak ditemukan";
+        });
+      }
+    } catch (e) {
+      print('Error: $e');
+      setState(() {
+        _jamKerja = "Error: $e";
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (_jamKerja == null || _formattedDate == null) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -56,31 +172,34 @@ class UserDashboardScreen extends StatelessWidget {
                 color: Colors.amber[700],
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Column(
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text("Jam Kerja",
+                      const Text("Jam Kerja",
                           style: TextStyle(fontSize: 16, color: Colors.white)),
-                      Text("Sen, 11 Januari 2024",
-                          style: TextStyle(fontSize: 14, color: Colors.white)),
+                      Text(_formattedDate!,
+                          style: const TextStyle(
+                              fontSize: 14, color: Colors.white)),
                     ],
                   ),
-                  SizedBox(height: 8),
+                  const SizedBox(height: 8),
                   Text(
-                    "08.00 - 16.00",
-                    style: TextStyle(
+                    _jamKerja!,
+                    style: const TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
                     ),
                   ),
-                  SizedBox(height: 4),
+                  const SizedBox(height: 4),
                   Text(
-                    "Selamat beraktivitas",
-                    style: TextStyle(fontSize: 14, color: Colors.white),
+                    _isLibur
+                        ? "Nikmati hari libur Anda"
+                        : "Selamat beraktivitas",
+                    style: const TextStyle(fontSize: 14, color: Colors.white),
                   ),
                 ],
               ),

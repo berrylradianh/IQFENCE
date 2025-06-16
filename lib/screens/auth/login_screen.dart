@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:iqfence/providers/Auth.dart';
 import 'package:iqfence/screens/auth/forgotPasswordPage.dart';
 import 'package:iqfence/screens/auth/register_screen.dart';
-import 'package:iqfence/providers/Auth.dart';
 import 'package:iqfence/screens/home/bottomnavbar.dart';
 import 'package:provider/provider.dart';
-
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -104,7 +103,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => ForgotPasswordPage(),
+                          builder: (context) => const ForgotPasswordPage(),
                         ),
                       );
                     },
@@ -134,14 +133,15 @@ class _LoginScreenState extends State<LoginScreen> {
                       Navigator.pushReplacement(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => BottomnavbarScreen(isAdmin: true),
+                          builder: (context) =>
+                              const BottomnavbarScreen(isAdmin: true),
                         ),
                       );
                     } else {
                       Navigator.pushReplacement(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => BottomnavbarScreen(),
+                          builder: (context) => const BottomnavbarScreen(),
                         ),
                       );
                     }
