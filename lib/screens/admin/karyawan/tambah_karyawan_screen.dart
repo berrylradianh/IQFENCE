@@ -17,6 +17,33 @@ class TambahKaryawanScreen extends StatefulWidget {
 class _TambahKaryawanScreenState extends State<TambahKaryawanScreen> {
   final TextEditingController _namaController = TextEditingController();
   final TextEditingController _alamatController = TextEditingController();
+  final Map<String, TimeOfDay?> _jamMulai = {
+    'Senin': null,
+    'Selasa': null,
+    'Rabu': null,
+    'Kamis': null,
+    'Jumat': null,
+    'Sabtu': null,
+    'Minggu': null,
+  };
+  final Map<String, TimeOfDay?> _jamSelesai = {
+    'Senin': null,
+    'Selasa': null,
+    'Rabu': null,
+    'Kamis': null,
+    'Jumat': null,
+    'Sabtu': null,
+    'Minggu': null,
+  };
+  final Map<String, bool> _hariLibur = {
+    'Senin': false,
+    'Selasa': false,
+    'Rabu': false,
+    'Kamis': false,
+    'Jumat': false,
+    'Sabtu': false,
+    'Minggu': false,
+  };
   File? _selectedImage;
   String? _imagePath;
   bool _isLoading = false;
@@ -50,27 +77,22 @@ class _TambahKaryawanScreenState extends State<TambahKaryawanScreen> {
           _selectedImage = File(pickedFile.path);
         });
 
-        // Mendapatkan direktori dokumen aplikasi
         final appDir = await getApplicationDocumentsDirectory();
         final karyawanDir = Directory('${appDir.path}/karyawan');
 
-        // Membuat folder karyawan jika belum ada
         if (!await karyawanDir.exists()) {
           await karyawanDir.create(recursive: true);
         }
 
-        // Membuat nama file unik
         final fileName =
             'karyawan_${DateTime.now().millisecondsSinceEpoch}.jpg';
         final savedImage =
             await _selectedImage!.copy('${karyawanDir.path}/$fileName');
 
         setState(() {
-          // Simpan path relatif untuk Firestore
           _imagePath = 'karyawan/$fileName';
         });
 
-        // Instruksi untuk menyalin file ke assets/karyawan
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -90,6 +112,29 @@ class _TambahKaryawanScreenState extends State<TambahKaryawanScreen> {
     }
   }
 
+  Future<void> _pickTime(String hari, bool isJamMulai) async {
+    final TimeOfDay? picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.now(),
+    );
+    if (picked != null) {
+      setState(() {
+        if (isJamMulai) {
+          _jamMulai[hari] = picked;
+        } else {
+          _jamSelesai[hari] = picked;
+        }
+      });
+    }
+  }
+
+  String _formatTime(TimeOfDay? time) {
+    if (time == null) return '--:--';
+    final hour = time.hour.toString().padLeft(2, '0');
+    final minute = time.minute.toString().padLeft(2, '0');
+    return '$hour:$minute';
+  }
+
   Future<void> _tambahKaryawan() async {
     if (FirebaseAuth.instance.currentUser == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -103,7 +148,7 @@ class _TambahKaryawanScreenState extends State<TambahKaryawanScreen> {
 
     if (nama.isEmpty || alamat.isEmpty || _imagePath == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Semua field harus diisi')),
+        const SnackBar(content: Text('Nama, alamat, dan foto harus diisi')),
       );
       return;
     }
@@ -113,11 +158,24 @@ class _TambahKaryawanScreenState extends State<TambahKaryawanScreen> {
     });
 
     try {
+      final jamKerja = _jamMulai.keys.map((hari) => MapEntry(
+            hari,
+            {
+              'jam_mulai':
+                  _hariLibur[hari] == true ? '-' : _formatTime(_jamMulai[hari]),
+              'jam_selesai': _hariLibur[hari] == true
+                  ? '-'
+                  : _formatTime(_jamSelesai[hari]),
+              'libur': _hariLibur[hari] ?? false,
+            },
+          ));
+
       await FirebaseFirestore.instance.collection('karyawan').add({
         'nama': nama,
         'alamat': alamat,
-        'foto': _imagePath, // Simpan path relatif untuk assets
+        'foto': _imagePath,
         'posisi': 'Karyawan',
+        'jam_kerja': Map.fromEntries(jamKerja),
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -201,6 +259,100 @@ class _TambahKaryawanScreenState extends State<TambahKaryawanScreen> {
                     style: const TextStyle(fontSize: 12),
                   ),
                 ),
+              const SizedBox(height: 24),
+              const Text(
+                'Jadwal Kerja',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              ..._jamMulai.keys.map((hari) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 16.0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        flex: 2,
+                        child: Text(
+                          hari,
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                      ),
+                      Expanded(
+                        flex: 3,
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: _hariLibur[hari] == true
+                                    ? null
+                                    : () => _pickTime(hari, true),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: 12, horizontal: 10),
+                                  decoration: BoxDecoration(
+                                    border: Border.all(color: Colors.grey),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text(
+                                    _formatTime(_jamMulai[hari]),
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: _hariLibur[hari] == true
+                                          ? Colors.grey
+                                          : Colors.black,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: _hariLibur[hari] == true
+                                    ? null
+                                    : () => _pickTime(hari, false),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: 12, horizontal: 10),
+                                  decoration: BoxDecoration(
+                                    border: Border.all(color: Colors.grey),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text(
+                                    _formatTime(_jamSelesai[hari]),
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: _hariLibur[hari] == true
+                                          ? Colors.grey
+                                          : Colors.black,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Checkbox(
+                        value: _hariLibur[hari],
+                        onChanged: (value) {
+                          setState(() {
+                            _hariLibur[hari] = value ?? false;
+                            if (value == true) {
+                              _jamMulai[hari] = null;
+                              _jamSelesai[hari] = null;
+                            }
+                          });
+                        },
+                      ),
+                      const Text('Libur'),
+                    ],
+                  ),
+                );
+              }),
               const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: _isLoading ? null : _tambahKaryawan,

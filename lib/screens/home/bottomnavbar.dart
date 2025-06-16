@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:iqfence/screens/admin/admin_dashboard_screen.dart';
 import 'package:iqfence/screens/admin/karyawan/kelola_karyawan_screen.dart';
 import 'package:iqfence/screens/profile/profileScreen.dart';
+import 'package:iqfence/screens/user/user_dashboard_screen.dart';
 
 class BottomnavbarScreen extends StatefulWidget {
   final bool isAdmin;
@@ -16,15 +17,62 @@ class _BottomnavbarScreenState extends State<BottomnavbarScreen> {
   int _currentIndex = 0;
 
   Widget _getPage(int index) {
-    switch (index) {
-      case 0:
-        return const AdminDashboardScreen();
-      case 1:
-        return const KelolaKaryawanScreen();
-      case 2:
-        return const ProfileScreen();
-      default:
-        return const Center(child: Text('Halaman Tidak Ditemukan'));
+    if (widget.isAdmin) {
+      switch (index) {
+        case 0:
+          return const AdminDashboardScreen();
+        case 1:
+          return const KelolaKaryawanScreen();
+        case 2:
+          return const ProfileScreen();
+        default:
+          return const Center(child: Text('Halaman Tidak Ditemukan'));
+      }
+    } else {
+      switch (index) {
+        case 0:
+          return const UserDashboardScreen();
+        case 1:
+          return const Center(child: Text('Presensi Screen'));
+        case 2:
+          return const ProfileScreen();
+        default:
+          return const Center(child: Text('Halaman Tidak Ditemukan'));
+      }
+    }
+  }
+
+  List<BottomNavigationBarItem> _getNavBarItems() {
+    if (widget.isAdmin) {
+      return const [
+        BottomNavigationBarItem(
+          icon: Icon(Icons.home),
+          label: 'Beranda',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.groups),
+          label: 'Karyawan',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.person),
+          label: 'Profile',
+        ),
+      ];
+    } else {
+      return const [
+        BottomNavigationBarItem(
+          icon: Icon(Icons.home),
+          label: 'Beranda',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.camera_alt),
+          label: 'Presensi',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.person),
+          label: 'Profile',
+        ),
+      ];
     }
   }
 
@@ -39,20 +87,7 @@ class _BottomnavbarScreenState extends State<BottomnavbarScreen> {
             _currentIndex = index;
           });
         },
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Beranda',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.groups),
-            label: 'Karyawan',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'Profile',
-          ),
-        ],
+        items: _getNavBarItems(),
         type: BottomNavigationBarType.fixed,
         backgroundColor: Colors.white,
         selectedItemColor: Colors.blue,
