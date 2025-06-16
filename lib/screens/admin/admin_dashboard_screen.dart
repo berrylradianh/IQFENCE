@@ -51,30 +51,20 @@ class AdminDashboardScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text("Jam Kerja",
-                          style: TextStyle(fontSize: 16, color: Colors.white)),
-                      Text("Sen, 11 Januari 2024",
-                          style: TextStyle(fontSize: 14, color: Colors.white)),
-                    ],
-                  ),
-                  SizedBox(height: 8),
                   Text(
-                    "08.00 - 16.00",
+                    "Halo, Selamat Datang!",
                     style: TextStyle(
-                      fontSize: 28,
+                      fontSize: 20,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
                     ),
                   ),
-                  SizedBox(height: 4),
+                  SizedBox(height: 8),
                   Text(
-                    "Selamat beraktivitas",
-                    style: TextStyle(fontSize: 14, color: Colors.white),
+                    "Kelola aktivitas karyawan dengan mudah",
+                    style: TextStyle(fontSize: 16, color: Colors.white),
                   ),
                 ],
               ),
@@ -123,7 +113,6 @@ class AdminDashboardScreen extends StatelessWidget {
                     icon: LucideIcons.calendarClock,
                     title: "Kelola Lembur",
                     color: Colors.amber[700]!,
-                    showNotification: true,
                     onTap: () {
                       Navigator.push(
                         context,

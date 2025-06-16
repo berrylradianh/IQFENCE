@@ -256,7 +256,6 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                     icon: LucideIcons.calendarClock,
                     title: "Lembur",
                     color: Colors.amber[700]!,
-                    showNotification: true,
                     onTap: () {
                       Navigator.push(
                         context,
