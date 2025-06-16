@@ -258,9 +258,43 @@ class _PresensiFotoScreenState extends State<PresensiFotoScreen> {
     }
 
     try {
+      // Ambil data pengguna dari koleksi users untuk mendapatkan karyawan_id
+      debugPrint('Mengambil data pengguna dari koleksi users...');
+      DocumentSnapshot userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .get();
+
+      if (!userDoc.exists || userDoc.data() == null) {
+        debugPrint('Data pengguna tidak ditemukan');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Data pengguna tidak ditemukan'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
+      String? karyawanId = userData['karyawan_id'];
+
+      if (karyawanId == null) {
+        debugPrint('Karyawan ID tidak ditemukan');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Karyawan ID tidak ditemukan'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      debugPrint('Karyawan ID: $karyawanId');
       debugPrint('Menulis ke Firestore');
       await FirebaseFirestore.instance.collection('presensi').add({
-        'karyawan_id': userId,
+        'user_id': userId, // Mengganti karyawan_id menjadi user_id
+        'karyawan_id': karyawanId, // Menambahkan karyawan_id dari koleksi users
         'type': widget.isDatang ? 'Presensi Datang' : 'Presensi Pulang',
         'jam_presensi': jamPresensi,
         'tanggal_presensi': tanggalPresensi,
