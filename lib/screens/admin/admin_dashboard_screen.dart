@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:iqfence/screens/admin/izin/kelola_izin_screen.dart';
 import 'package:iqfence/screens/admin/lembur/kelola_lembur_screen.dart';
 import 'package:iqfence/screens/admin/lokasi/kelola_lokasi_screen.dart';
+import 'package:iqfence/screens/admin/riwayat/riwayat_screen.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 class AdminDashboardScreen extends StatelessWidget {
@@ -107,7 +108,13 @@ class AdminDashboardScreen extends StatelessWidget {
                     icon: LucideIcons.clock4,
                     title: "Riwayat",
                     color: Colors.amber[700]!,
-                    onTap: () {},
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const AdminRiwayatScreen()),
+                      );
+                    },
                   ),
                   _DashboardMenuItem(
                     icon: LucideIcons.calendarClock,
