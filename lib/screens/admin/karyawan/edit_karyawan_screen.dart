@@ -24,6 +24,7 @@ class EditKaryawanScreen extends StatefulWidget {
 class _EditKaryawanScreenState extends State<EditKaryawanScreen> {
   final TextEditingController _namaController = TextEditingController();
   final TextEditingController _alamatController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
   final Map<String, TimeOfDay?> _jamMulai = {
     'Senin': null,
     'Selasa': null,
@@ -55,6 +56,8 @@ class _EditKaryawanScreenState extends State<EditKaryawanScreen> {
   String? _imagePath;
   bool _isLoading = false;
   final ImagePicker _picker = ImagePicker();
+  List<Map<String, dynamic>> _locations = [];
+  final List<String> _selectedLocationIds = [];
 
   @override
   void initState() {
@@ -62,7 +65,10 @@ class _EditKaryawanScreenState extends State<EditKaryawanScreen> {
     // Inisialisasi field dengan data karyawan yang ada
     _namaController.text = widget.karyawanData['nama'] ?? '';
     _alamatController.text = widget.karyawanData['alamat'] ?? '';
+    _emailController.text = ''; // Email akan diambil dari users collection
     _imagePath = widget.karyawanData['foto'];
+    _selectedLocationIds
+        .addAll(List<String>.from(widget.karyawanData['location_ids'] ?? []));
     if (_imagePath != null) {
       _loadExistingImage();
     }
@@ -79,6 +85,46 @@ class _EditKaryawanScreenState extends State<EditKaryawanScreen> {
           }
         }
       });
+    }
+    _fetchLocations();
+    _fetchUserEmail();
+  }
+
+  Future<void> _fetchLocations() async {
+    try {
+      final snapshot =
+          await FirebaseFirestore.instance.collection('locations').get();
+      setState(() {
+        _locations = snapshot.docs
+            .map((doc) => {
+                  'id': doc.id,
+                  'namaLokasi': doc.data()['namaLokasi'],
+                  'koordinat': doc.data()['koordinat'],
+                })
+            .toList();
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error mengambil data lokasi: $e')),
+      );
+    }
+  }
+
+  Future<void> _fetchUserEmail() async {
+    try {
+      final userSnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .where('karyawan_id', isEqualTo: widget.docId)
+          .get();
+      if (userSnapshot.docs.isNotEmpty) {
+        setState(() {
+          _emailController.text = userSnapshot.docs.first.data()['email'] ?? '';
+        });
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error mengambil data email: $e')),
+      );
     }
   }
 
@@ -200,10 +246,17 @@ class _EditKaryawanScreenState extends State<EditKaryawanScreen> {
 
     final nama = _namaController.text.trim();
     final alamat = _alamatController.text.trim();
+    final email = _emailController.text.trim();
 
-    if (nama.isEmpty || alamat.isEmpty || _imagePath == null) {
+    if (nama.isEmpty ||
+        alamat.isEmpty ||
+        email.isEmpty ||
+        _imagePath == null ||
+        _selectedLocationIds.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nama, alamat, dan foto harus diisi')),
+        const SnackBar(
+            content: Text(
+                'Nama, alamat, email, foto, dan minimal satu lokasi harus diisi')),
       );
       return;
     }
@@ -225,6 +278,7 @@ class _EditKaryawanScreenState extends State<EditKaryawanScreen> {
             },
           ));
 
+      // Update karyawan di collection karyawan
       await FirebaseFirestore.instance
           .collection('karyawan')
           .doc(widget.docId)
@@ -234,7 +288,34 @@ class _EditKaryawanScreenState extends State<EditKaryawanScreen> {
         'foto': _imagePath,
         'posisi': widget.karyawanData['posisi'] ?? 'Karyawan',
         'jam_kerja': Map.fromEntries(jamKerja),
+        'location_ids': _selectedLocationIds,
       });
+
+      // Update email di collection users
+      final userSnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .where('karyawan_id', isEqualTo: widget.docId)
+          .get();
+      if (userSnapshot.docs.isNotEmpty) {
+        final userId = userSnapshot.docs.first.id;
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userId)
+            .update({
+          'email': email,
+          'nama': nama,
+        });
+
+        // Update email di Firebase Authentication
+        final user = await FirebaseAuth.instance.fetchSignInMethodsForEmail(
+            userSnapshot.docs.first.data()['email']);
+        if (user.isNotEmpty) {
+          final currentUser = FirebaseAuth.instance.currentUser;
+          if (currentUser != null && currentUser.uid == userId) {
+            await currentUser.updateEmail(email);
+          }
+        }
+      }
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Karyawan berhasil diperbarui')),
@@ -290,6 +371,45 @@ class _EditKaryawanScreenState extends State<EditKaryawanScreen> {
                   ),
                 ),
               ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _emailController,
+                decoration: InputDecoration(
+                  labelText: 'Email',
+                  hintText: 'Masukkan email karyawan',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                keyboardType: TextInputType.emailAddress,
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Pilih Lokasi',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              _locations.isEmpty
+                  ? const Text('Tidak ada lokasi tersedia')
+                  : Wrap(
+                      spacing: 8.0,
+                      children: _locations.map((location) {
+                        return FilterChip(
+                          label: Text(location['namaLokasi']),
+                          selected:
+                              _selectedLocationIds.contains(location['id']),
+                          onSelected: (selected) {
+                            setState(() {
+                              if (selected) {
+                                _selectedLocationIds.add(location['id']);
+                              } else {
+                                _selectedLocationIds.remove(location['id']);
+                              }
+                            });
+                          },
+                        );
+                      }).toList(),
+                    ),
               const SizedBox(height: 16),
               GestureDetector(
                 onTap: _pickImage,
@@ -445,6 +565,7 @@ class _EditKaryawanScreenState extends State<EditKaryawanScreen> {
   void dispose() {
     _namaController.dispose();
     _alamatController.dispose();
+    _emailController.dispose();
     super.dispose();
   }
 }

@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
@@ -86,7 +87,8 @@ class _PresensiScreenState extends State<PresensiScreen> {
     }
   }
 
-  void _confirmPresence(double targetLatitude, double targetLongitude, double radius) {
+  void _confirmPresence(
+      double targetLatitude, double targetLongitude, double radius) {
     final distance = _calculateDistance(targetLatitude, targetLongitude);
 
     if (distance > radius) {
@@ -197,11 +199,13 @@ class _PresensiScreenState extends State<PresensiScreen> {
   Widget _buildUserView() {
     // Tampilan untuk user
     if (locations.isEmpty) {
-      return const Center(child: Text('Tidak ada lokasi presensi yang tersedia.'));
+      return const Center(
+          child: Text('Tidak ada lokasi presensi yang tersedia.'));
     }
 
     final location = locations.first; // Lokasi pertama sebagai contoh
-    final distance = _calculateDistance(location['latitude'], location['longitude']);
+    final distance =
+        _calculateDistance(location['latitude'], location['longitude']);
 
     return Padding(
       padding: const EdgeInsets.all(16),
@@ -211,7 +215,8 @@ class _PresensiScreenState extends State<PresensiScreen> {
             child: ListTile(
               leading: const Icon(Icons.location_on, color: Colors.amber),
               title: const Text('Lokasi Tujuan'),
-              subtitle: Text('Lat: ${location['latitude']}, Lng: ${location['longitude']}'),
+              subtitle: Text(
+                  'Lat: ${location['latitude']}, Lng: ${location['longitude']}'),
               trailing: distance > location['radius']
                   ? const Text(
                       'Di Luar Area',

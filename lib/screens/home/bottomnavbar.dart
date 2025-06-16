@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:iqfence/screens/admin/admin_dashboard_screen.dart';
 import 'package:iqfence/screens/admin/karyawan/kelola_karyawan_screen.dart';
 import 'package:iqfence/screens/profile/profileScreen.dart';
+import 'package:iqfence/screens/user/presensi/presensi_screen.dart';
 import 'package:iqfence/screens/user/user_dashboard_screen.dart';
 
 class BottomnavbarScreen extends StatefulWidget {
@@ -33,7 +34,7 @@ class _BottomnavbarScreenState extends State<BottomnavbarScreen> {
         case 0:
           return const UserDashboardScreen();
         case 1:
-          return const Center(child: Text('Presensi Screen'));
+          return const PresensiScreen();
         case 2:
           return const ProfileScreen();
         default:
