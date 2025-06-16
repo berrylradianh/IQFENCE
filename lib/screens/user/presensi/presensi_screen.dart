@@ -196,7 +196,7 @@ class _PresensiScreenState extends State<PresensiScreen> {
       final today = DateFormat('dd MMM yyyy').format(DateTime.now());
       final snapshot = await FirebaseFirestore.instance
           .collection('presensi')
-          .where('karyawan_id', isEqualTo: userId)
+          .where('user_id', isEqualTo: userId)
           .where('tanggal_presensi', isEqualTo: today)
           .get();
 

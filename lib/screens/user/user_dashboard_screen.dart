@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:iqfence/providers/Auth.dart';
 import 'package:iqfence/screens/user/izin/izin_screen.dart';
 import 'package:iqfence/screens/user/lembur/lembur_screen.dart';
+import 'package:iqfence/screens/user/riwayat/riwayat_screen.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:provider/provider.dart';
 
@@ -236,7 +237,13 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                     icon: LucideIcons.clock4,
                     title: "Riwayat",
                     color: Colors.amber[700]!,
-                    onTap: () {},
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const RiwayatScreen()),
+                      );
+                    },
                   ),
                   _DashboardMenuItem(
                     icon: LucideIcons.calendarClock,
