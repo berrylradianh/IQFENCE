@@ -49,6 +49,34 @@ class _TambahKaryawanScreenState extends State<TambahKaryawanScreen> {
   String? _imagePath;
   bool _isLoading = false;
   final ImagePicker _picker = ImagePicker();
+  List<Map<String, dynamic>> _locations = [];
+  final List<String> _selectedLocationIds = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchLocations();
+  }
+
+  Future<void> _fetchLocations() async {
+    try {
+      final snapshot =
+          await FirebaseFirestore.instance.collection('locations').get();
+      setState(() {
+        _locations = snapshot.docs
+            .map((doc) => {
+                  'id': doc.id,
+                  'namaLokasi': doc.data()['namaLokasi'],
+                  'koordinat': doc.data()['koordinat'],
+                })
+            .toList();
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error mengambil data lokasi: $e')),
+      );
+    }
+  }
 
   Future<bool> _requestGalleryPermission() async {
     final status = await Permission.photos.request();
@@ -148,10 +176,15 @@ class _TambahKaryawanScreenState extends State<TambahKaryawanScreen> {
     final alamat = _alamatController.text.trim();
     final email = _emailController.text.trim();
 
-    if (nama.isEmpty || alamat.isEmpty || email.isEmpty || _imagePath == null) {
+    if (nama.isEmpty ||
+        alamat.isEmpty ||
+        email.isEmpty ||
+        _imagePath == null ||
+        _selectedLocationIds.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('Nama, alamat, email, dan foto harus diisi')),
+            content: Text(
+                'Nama, alamat, email, foto, dan minimal satu lokasi harus diisi')),
       );
       return;
     }
@@ -181,6 +214,7 @@ class _TambahKaryawanScreenState extends State<TambahKaryawanScreen> {
         'foto': _imagePath,
         'posisi': 'Karyawan',
         'jam_kerja': Map.fromEntries(jamKerja),
+        'location_ids': _selectedLocationIds,
       });
 
       // Buat akun pengguna di Firebase Authentication
@@ -264,6 +298,33 @@ class _TambahKaryawanScreenState extends State<TambahKaryawanScreen> {
                 ),
                 keyboardType: TextInputType.emailAddress,
               ),
+              const SizedBox(height: 16),
+              const Text(
+                'Pilih Lokasi',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              _locations.isEmpty
+                  ? const Text('Tidak ada lokasi tersedia')
+                  : Wrap(
+                      spacing: 8.0,
+                      children: _locations.map((location) {
+                        return FilterChip(
+                          label: Text(location['namaLokasi']),
+                          selected:
+                              _selectedLocationIds.contains(location['id']),
+                          onSelected: (selected) {
+                            setState(() {
+                              if (selected) {
+                                _selectedLocationIds.add(location['id']);
+                              } else {
+                                _selectedLocationIds.remove(location['id']);
+                              }
+                            });
+                          },
+                        );
+                      }).toList(),
+                    ),
               const SizedBox(height: 16),
               GestureDetector(
                 onTap: _pickImage,
