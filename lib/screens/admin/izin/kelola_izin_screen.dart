@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:iqfence/screens/admin/izin/tambah_izin_screen.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 class KelolaIzinScreen extends StatefulWidget {
@@ -13,19 +12,12 @@ class KelolaIzinScreen extends StatefulWidget {
 
 class _KelolaIzinScreenState extends State<KelolaIzinScreen>
     with SingleTickerProviderStateMixin {
-  final TextEditingController _searchController = TextEditingController();
-  String _searchQuery = '';
   late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _searchController.addListener(() {
-      setState(() {
-        _searchQuery = _searchController.text.toLowerCase();
-      });
-    });
   }
 
   Future<bool?> _showApprovalConfirmationDialog(
@@ -79,7 +71,6 @@ class _KelolaIzinScreenState extends State<KelolaIzinScreen>
 
   @override
   void dispose() {
-    _searchController.dispose();
     _tabController.dispose();
     super.dispose();
   }
@@ -129,48 +120,6 @@ class _KelolaIzinScreenState extends State<KelolaIzinScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _searchController,
-                      decoration: InputDecoration(
-                        hintText: 'Cari Karyawan',
-                        prefixIcon: const Icon(Icons.search),
-                        filled: true,
-                        fillColor: Colors.grey[200],
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const TambahIzinScreen(),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.add),
-                    label: const Text('Tambah'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.amber[700],
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
               Expanded(
                 child: TabBarView(
                   controller: _tabController,
@@ -179,7 +128,7 @@ class _KelolaIzinScreenState extends State<KelolaIzinScreen>
                     StreamBuilder<QuerySnapshot>(
                       stream: FirebaseFirestore.instance
                           .collection('izin')
-                          .where('statusIzin', isEqualTo: 'Aktif')
+                          .where('statusIzin', isEqualTo: 'Menunggu')
                           .snapshots(),
                       builder: (context, snapshot) {
                         if (snapshot.connectionState ==
@@ -196,17 +145,7 @@ class _KelolaIzinScreenState extends State<KelolaIzinScreen>
                               child: Text('Tidak ada izin aktif'));
                         }
 
-                        final izinDocs = snapshot.data!.docs.where((doc) {
-                          final izin = doc.data() as Map<String, dynamic>;
-                          final nama =
-                              (izin['userData']['nama'] ?? '').toLowerCase();
-                          return nama.contains(_searchQuery);
-                        }).toList();
-
-                        if (izinDocs.isEmpty && _searchQuery.isNotEmpty) {
-                          return const Center(
-                              child: Text('Tidak ada karyawan yang cocok'));
-                        }
+                        final izinDocs = snapshot.data!.docs;
 
                         return ListView.builder(
                           itemCount: izinDocs.length,
@@ -277,7 +216,7 @@ class _KelolaIzinScreenState extends State<KelolaIzinScreen>
                                             errorBuilder:
                                                 (context, error, stackTrace) {
                                               return Image.asset(
-                                                'assets/' + fotoPath,
+                                                'assets/placeholder.png',
                                                 width: 60,
                                                 height: 60,
                                                 fit: BoxFit.cover,
@@ -425,17 +364,7 @@ class _KelolaIzinScreenState extends State<KelolaIzinScreen>
                               child: Text('Tidak ada izin selesai'));
                         }
 
-                        final izinDocs = snapshot.data!.docs.where((doc) {
-                          final izin = doc.data() as Map<String, dynamic>;
-                          final nama =
-                              (izin['userData']['nama'] ?? '').toLowerCase();
-                          return nama.contains(_searchQuery);
-                        }).toList();
-
-                        if (izinDocs.isEmpty && _searchQuery.isNotEmpty) {
-                          return const Center(
-                              child: Text('Tidak ada karyawan yang cocok'));
-                        }
+                        final izinDocs = snapshot.data!.docs;
 
                         return ListView.builder(
                           itemCount: izinDocs.length,
@@ -507,7 +436,7 @@ class _KelolaIzinScreenState extends State<KelolaIzinScreen>
                                             errorBuilder:
                                                 (context, error, stackTrace) {
                                               return Image.asset(
-                                                'assets/' + fotoPath,
+                                                'assets/placeholder.png',
                                                 width: 60,
                                                 height: 60,
                                                 fit: BoxFit.cover,
