@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:iqfence/screens/admin/lembur/tambah_lembur_screen.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 class KelolaLemburScreen extends StatefulWidget {
@@ -13,19 +12,12 @@ class KelolaLemburScreen extends StatefulWidget {
 
 class _KelolaLemburScreenState extends State<KelolaLemburScreen>
     with SingleTickerProviderStateMixin {
-  final TextEditingController _searchController = TextEditingController();
-  String _searchQuery = '';
   late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _searchController.addListener(() {
-      setState(() {
-        _searchQuery = _searchController.text.toLowerCase();
-      });
-    });
   }
 
   Future<bool?> _showApprovalConfirmationDialog(
@@ -79,7 +71,6 @@ class _KelolaLemburScreenState extends State<KelolaLemburScreen>
 
   @override
   void dispose() {
-    _searchController.dispose();
     _tabController.dispose();
     super.dispose();
   }
@@ -129,48 +120,6 @@ class _KelolaLemburScreenState extends State<KelolaLemburScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _searchController,
-                      decoration: InputDecoration(
-                        hintText: 'Cari Karyawan',
-                        prefixIcon: const Icon(Icons.search),
-                        filled: true,
-                        fillColor: Colors.grey[200],
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const TambahLemburScreen(),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.add),
-                    label: const Text('Tambah'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.amber[700],
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
               Expanded(
                 child: TabBarView(
                   controller: _tabController,
@@ -179,7 +128,7 @@ class _KelolaLemburScreenState extends State<KelolaLemburScreen>
                     StreamBuilder<QuerySnapshot>(
                       stream: FirebaseFirestore.instance
                           .collection('lembur')
-                          .where('statusLembur', isEqualTo: 'Aktif')
+                          .where('statusLembur', isEqualTo: 'Menunggu')
                           .snapshots(),
                       builder: (context, snapshot) {
                         if (snapshot.connectionState ==
@@ -196,17 +145,7 @@ class _KelolaLemburScreenState extends State<KelolaLemburScreen>
                               child: Text('Tidak ada lembur aktif'));
                         }
 
-                        final lemburDocs = snapshot.data!.docs.where((doc) {
-                          final lembur = doc.data() as Map<String, dynamic>;
-                          final nama =
-                              (lembur['userData']['nama'] ?? '').toLowerCase();
-                          return nama.contains(_searchQuery);
-                        }).toList();
-
-                        if (lemburDocs.isEmpty && _searchQuery.isNotEmpty) {
-                          return const Center(
-                              child: Text('Tidak ada karyawan yang cocok'));
-                        }
+                        final lemburDocs = snapshot.data!.docs;
 
                         return ListView.builder(
                           itemCount: lemburDocs.length,
@@ -278,7 +217,7 @@ class _KelolaLemburScreenState extends State<KelolaLemburScreen>
                                             errorBuilder:
                                                 (context, error, stackTrace) {
                                               return Image.asset(
-                                                'assets/' + fotoPath,
+                                                'assets/placeholder.png',
                                                 width: 60,
                                                 height: 60,
                                                 fit: BoxFit.cover,
@@ -426,17 +365,7 @@ class _KelolaLemburScreenState extends State<KelolaLemburScreen>
                               child: Text('Tidak ada lembur selesai'));
                         }
 
-                        final lemburDocs = snapshot.data!.docs.where((doc) {
-                          final lembur = doc.data() as Map<String, dynamic>;
-                          final nama =
-                              (lembur['userData']['nama'] ?? '').toLowerCase();
-                          return nama.contains(_searchQuery);
-                        }).toList();
-
-                        if (lemburDocs.isEmpty && _searchQuery.isNotEmpty) {
-                          return const Center(
-                              child: Text('Tidak ada karyawan yang cocok'));
-                        }
+                        final lemburDocs = snapshot.data!.docs;
 
                         return ListView.builder(
                           itemCount: lemburDocs.length,
@@ -510,7 +439,7 @@ class _KelolaLemburScreenState extends State<KelolaLemburScreen>
                                             errorBuilder:
                                                 (context, error, stackTrace) {
                                               return Image.asset(
-                                                'assets/' + fotoPath,
+                                                'assets/placeholder.png',
                                                 width: 60,
                                                 height: 60,
                                                 fit: BoxFit.cover,
