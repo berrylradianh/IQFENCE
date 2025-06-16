@@ -17,6 +17,7 @@ class TambahKaryawanScreen extends StatefulWidget {
 class _TambahKaryawanScreenState extends State<TambahKaryawanScreen> {
   final TextEditingController _namaController = TextEditingController();
   final TextEditingController _alamatController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
   final Map<String, TimeOfDay?> _jamMulai = {
     'Senin': null,
     'Selasa': null,
@@ -145,10 +146,12 @@ class _TambahKaryawanScreenState extends State<TambahKaryawanScreen> {
 
     final nama = _namaController.text.trim();
     final alamat = _alamatController.text.trim();
+    final email = _emailController.text.trim();
 
-    if (nama.isEmpty || alamat.isEmpty || _imagePath == null) {
+    if (nama.isEmpty || alamat.isEmpty || email.isEmpty || _imagePath == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nama, alamat, dan foto harus diisi')),
+        const SnackBar(
+            content: Text('Nama, alamat, email, dan foto harus diisi')),
       );
       return;
     }
@@ -158,6 +161,7 @@ class _TambahKaryawanScreenState extends State<TambahKaryawanScreen> {
     });
 
     try {
+      // Tambah ke collection karyawan
       final jamKerja = _jamMulai.keys.map((hari) => MapEntry(
             hari,
             {
@@ -170,7 +174,8 @@ class _TambahKaryawanScreenState extends State<TambahKaryawanScreen> {
             },
           ));
 
-      await FirebaseFirestore.instance.collection('karyawan').add({
+      final karyawanDoc =
+          await FirebaseFirestore.instance.collection('karyawan').add({
         'nama': nama,
         'alamat': alamat,
         'foto': _imagePath,
@@ -178,8 +183,23 @@ class _TambahKaryawanScreenState extends State<TambahKaryawanScreen> {
         'jam_kerja': Map.fromEntries(jamKerja),
       });
 
+      // Buat akun pengguna di Firebase Authentication
+      final userCredential = await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(email: email, password: 'password');
+
+      // Tambah ke collection users
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userCredential.user!.uid)
+          .set({
+        'email': email,
+        'karyawan_id': karyawanDoc.id,
+        'nama': nama,
+        'role': 'karyawan',
+      });
+
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Karyawan berhasil ditambahkan')),
+        const SnackBar(content: Text('Karyawan dan user berhasil ditambahkan')),
       );
 
       Navigator.pop(context);
@@ -231,6 +251,18 @@ class _TambahKaryawanScreenState extends State<TambahKaryawanScreen> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _emailController,
+                decoration: InputDecoration(
+                  labelText: 'Email',
+                  hintText: 'Masukkan email karyawan',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                keyboardType: TextInputType.emailAddress,
               ),
               const SizedBox(height: 16),
               GestureDetector(
@@ -379,6 +411,7 @@ class _TambahKaryawanScreenState extends State<TambahKaryawanScreen> {
   void dispose() {
     _namaController.dispose();
     _alamatController.dispose();
+    _emailController.dispose();
     super.dispose();
   }
 }

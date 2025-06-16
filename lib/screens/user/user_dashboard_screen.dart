@@ -15,7 +15,7 @@ class UserDashboardScreen extends StatelessWidget {
         backgroundColor: Colors.white,
         elevation: 0,
         title: const Row(
-          mainAxisAlignment: MainAxisAlignment.start, // Align to start (left)
+          mainAxisAlignment: MainAxisAlignment.start,
           children: [
             CircleAvatar(
               backgroundColor: Colors.orange,
@@ -30,8 +30,6 @@ class UserDashboardScreen extends StatelessWidget {
                 color: Colors.black,
               ),
             ),
-            // Removed Spacer to keep logo at the left
-            // Text('User') moved to actions to keep it on the right
           ],
         ),
         actions: const [
