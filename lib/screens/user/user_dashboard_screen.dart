@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart'; // Import untuk inisialisasi locale
 import 'package:intl/intl.dart';
 import 'package:iqfence/providers/Auth.dart';
-import 'package:iqfence/screens/admin/izin/kelola_izin_screen.dart';
-import 'package:iqfence/screens/admin/lembur/kelola_lembur_screen.dart';
+import 'package:iqfence/screens/user/izin/izin_screen.dart';
+import 'package:iqfence/screens/user/lembur/lembur_screen.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:provider/provider.dart';
 
@@ -222,7 +222,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                            builder: (context) => const KelolaIzinScreen()),
+                            builder: (context) => const IzinScreen()),
                       );
                     },
                   ),
@@ -247,7 +247,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                            builder: (context) => const KelolaLemburScreen()),
+                            builder: (context) => const LemburScreen()),
                       );
                     },
                   ),
