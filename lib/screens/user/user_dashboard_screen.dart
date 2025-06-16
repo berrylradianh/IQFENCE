@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart'; // Import untuk inisialisasi locale
 import 'package:intl/intl.dart';
 import 'package:iqfence/providers/Auth.dart';
+import 'package:iqfence/screens/user/aktivitas/aktivitas_screen.dart';
 import 'package:iqfence/screens/user/izin/izin_screen.dart';
 import 'package:iqfence/screens/user/lembur/lembur_screen.dart';
 import 'package:iqfence/screens/user/riwayat/riwayat_screen.dart';
@@ -231,7 +232,13 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                     icon: LucideIcons.listTodo,
                     title: "Aktivitas",
                     color: Colors.amber[700]!,
-                    onTap: () {},
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const AktivitasScreen()),
+                      );
+                    },
                   ),
                   _DashboardMenuItem(
                     icon: LucideIcons.clock4,
