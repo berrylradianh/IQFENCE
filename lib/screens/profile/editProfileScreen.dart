@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:iqfence/components/custom_text_field.dart';
 import 'package:iqfence/providers/profileProvider.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 import 'package:provider/provider.dart';
 
 class EditProfileScreen extends StatefulWidget {
@@ -186,7 +187,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           style: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 18.0,
-            color: Colors.black,
+            color: Colors.white,
           ),
         ),
         centerTitle: true,
@@ -213,57 +214,71 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       Center(
                         child: Stack(
                           children: [
-                            CircleAvatar(
-                              radius: 70,
-                              backgroundColor: Colors.blue,
-                              backgroundImage: _imageFile != null
-                                  ? FileImage(_imageFile!)
-                                  : (profile.user.photoURL != null
-                                      ? NetworkImage(profile.user.photoURL!)
-                                      : null) as ImageProvider?,
-                              child: _imageFile == null &&
-                                      profile.user.photoURL == null
-                                  ? const Icon(Icons.person,
-                                      size: 100, color: Colors.white)
-                                  : null,
-                            ),
-                            Positioned(
-                              right: -4,
-                              bottom: -4,
-                              child: IconButton(
-                                icon: Image.asset('assets/edit.png'),
-                                onPressed: () {
-                                  showModalBottomSheet(
-                                    context: context,
-                                    builder: (context) => BottomSheet(
-                                      onClosing: () {},
-                                      builder: (context) => SafeArea(
-                                        child: Wrap(
-                                          children: [
-                                            ListTile(
-                                              leading:
-                                                  const Icon(Icons.camera_alt),
-                                              title: const Text('Kamera'),
-                                              onTap: () {
-                                                _getImage(ImageSource.camera);
-                                                Navigator.of(context).pop();
-                                              },
-                                            ),
-                                            ListTile(
-                                              leading: const Icon(
-                                                  Icons.photo_library),
-                                              title: const Text('Galeri'),
-                                              onTap: () {
-                                                _getImage(ImageSource.gallery);
-                                                Navigator.of(context).pop();
-                                              },
-                                            ),
-                                          ],
-                                        ),
+                            profile.user.photoURL == null
+                                ? Container(
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: Colors.blue,
+                                        width: 3,
                                       ),
+                                    ),
+                                    child: const CircleAvatar(
+                                      radius: 70,
+                                      backgroundColor: Colors.blue,
+                                      child: Icon(
+                                        Icons.person,
+                                        color: Colors.white,
+                                        size: 100,
+                                      ),
+                                    ),
+                                  )
+                                : Container(
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: Colors.blue,
+                                        width: 3,
+                                      ),
+                                    ),
+                                    child: CircleAvatar(
+                                      radius: 70,
+                                      backgroundImage:
+                                          NetworkImage(profile.user.photoURL!),
+                                    ),
+                                  ),
+                            Positioned(
+                              right: 0,
+                              bottom: 0,
+                              child: GestureDetector(
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          const EditProfileScreen(),
                                     ),
                                   );
                                 },
+                                child: Container(
+                                  decoration: const BoxDecoration(
+                                    color: Colors.white,
+                                    shape: BoxShape.circle,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black26,
+                                        blurRadius: 6,
+                                        offset: Offset(2, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  padding: const EdgeInsets.all(8),
+                                  child: const Icon(
+                                    LucideIcons.pencil,
+                                    color: Colors.blue,
+                                    size: 20,
+                                  ),
+                                ),
                               ),
                             ),
                           ],

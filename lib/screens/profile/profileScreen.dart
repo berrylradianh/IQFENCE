@@ -1,10 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:iqfence/components/custom_appbar.dart';
 import 'package:iqfence/providers/profileProvider.dart';
 import 'package:iqfence/screens/opening/hello_screen.dart';
 import 'package:iqfence/screens/profile/editProfileScreen.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 import 'package:provider/provider.dart';
 
 import '../../providers/Auth.dart';
@@ -59,7 +59,18 @@ class ProfileScreen extends StatelessWidget {
     }
 
     return Scaffold(
-      appBar: const CustomAppBar(),
+      appBar: AppBar(
+        title: const Text(
+          'Profil',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 18.0,
+            color: Colors.white,
+          ),
+        ),
+        centerTitle: true,
+        automaticallyImplyLeading: false,
+      ),
       body: Padding(
         padding: const EdgeInsets.all(10.0),
         child: StreamBuilder<DocumentSnapshot>(
@@ -90,26 +101,43 @@ class ProfileScreen extends StatelessWidget {
                 Stack(
                   children: [
                     profile.user.photoURL == null
-                        ? const CircleAvatar(
-                            radius: 70,
-                            backgroundColor: Colors.blue,
-                            child: Icon(
-                              Icons.person,
-                              color: Colors.white,
-                              size: 100,
+                        ? Container(
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: Colors.blue,
+                                width: 3,
+                              ),
+                            ),
+                            child: const CircleAvatar(
+                              radius: 70,
+                              backgroundColor: Colors.blue,
+                              child: Icon(
+                                Icons.person,
+                                color: Colors.white,
+                                size: 100,
+                              ),
                             ),
                           )
-                        : CircleAvatar(
-                            radius: 70,
-                            backgroundImage:
-                                NetworkImage(profile.user.photoURL!),
+                        : Container(
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: Colors.blue,
+                                width: 3,
+                              ),
+                            ),
+                            child: CircleAvatar(
+                              radius: 70,
+                              backgroundImage:
+                                  NetworkImage(profile.user.photoURL!),
+                            ),
                           ),
                     Positioned(
-                      right: -4,
-                      bottom: -4,
-                      child: IconButton(
-                        icon: Image.asset('assets/edit.png'),
-                        onPressed: () {
+                      right: 0,
+                      bottom: 0,
+                      child: GestureDetector(
+                        onTap: () {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
@@ -117,6 +145,25 @@ class ProfileScreen extends StatelessWidget {
                             ),
                           );
                         },
+                        child: Container(
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black26,
+                                blurRadius: 6,
+                                offset: Offset(2, 2),
+                              ),
+                            ],
+                          ),
+                          padding: const EdgeInsets.all(8),
+                          child: const Icon(
+                            LucideIcons.pencil,
+                            color: Colors.blue,
+                            size: 20,
+                          ),
+                        ),
                       ),
                     ),
                   ],
@@ -143,7 +190,8 @@ class ProfileScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(10.0),
                   ),
                   child: ListTile(
-                    leading: Image.asset('assets/people.png'),
+                    leading: const Icon(LucideIcons.clipboardEdit,
+                        color: Colors.blue),
                     title: const Text('Ubah Informasi Profil'),
                     trailing:
                         const Icon(Icons.arrow_forward_ios, color: Colors.blue),
@@ -164,7 +212,7 @@ class ProfileScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(10.0),
                   ),
                   child: ListTile(
-                    leading: Image.asset('assets/logout.png'),
+                    leading: const Icon(LucideIcons.logOut, color: Colors.blue),
                     title: const Text('Keluar dari Akun'),
                     trailing:
                         const Icon(Icons.arrow_forward_ios, color: Colors.blue),
