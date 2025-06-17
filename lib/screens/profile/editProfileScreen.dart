@@ -100,7 +100,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           };
 
     _nameController.text = data['nama']?.toString() ?? '';
-    _phoneController.text = data['phoneNumber']?.toString() ?? '';
+    // Remove leading '62', '+62', or '0' for display
+    final phoneNumber = data['phoneNumber']?.toString() ?? '';
+    _phoneController.text = phoneNumber.startsWith('62')
+        ? phoneNumber.substring(2)
+        : phoneNumber.startsWith('+62')
+            ? phoneNumber.substring(3)
+            : phoneNumber.startsWith('0')
+                ? phoneNumber.substring(1)
+                : phoneNumber;
     _emailController.text = user.email ?? '';
     _addressController.text = data['alamat']?.toString() ?? '';
     _genderController.text = data['gender']?.toString() ?? '';
@@ -182,6 +190,21 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
 
     return reauthenticated;
+  }
+
+  // Normalize phone number to 62 format for database
+  String _normalizePhoneNumber(String phone) {
+    // Remove any non-digit characters (e.g., spaces, dashes, +)
+    String cleaned = phone.replaceAll(RegExp(r'\D'), '');
+
+    // Handle different input formats
+    if (cleaned.startsWith('62')) {
+      return cleaned; // Already starts with 62
+    } else if (cleaned.startsWith('0')) {
+      return '62${cleaned.substring(1)}'; // Replace leading 0 with 62
+    } else {
+      return '62$cleaned'; // Assume it's a local number without 0 or 62
+    }
   }
 
   @override
@@ -358,6 +381,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         height: 100,
                         child: TextField(
                           controller: _addressController,
+                          minLines: 1,
                           maxLines: 3,
                           decoration: const InputDecoration(
                             hintText: 'Masukkan alamat Anda di sini',
@@ -454,9 +478,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               await profile
                                   .updateProfilePicture(_imageFile!.path);
                             }
+                            // Normalize phone number before updating
+                            final normalizedPhone =
+                                _normalizePhoneNumber(_phoneController.text);
                             await profile.updateUserProfile(
                               name: _nameController.text,
-                              phoneNumber: _phoneController.text,
+                              phoneNumber: normalizedPhone,
                               password: _passwordController.text.isNotEmpty
                                   ? _passwordController.text
                                   : null,
