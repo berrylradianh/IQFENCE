@@ -1,42 +1,58 @@
-import 'dart:io';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart' as firebase_storage;
 import 'package:flutter/foundation.dart';
+import 'package:rxdart/rxdart.dart'; // Added rxdart import
 
-class ProfileProvider extends ChangeNotifier {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final firebase_storage.FirebaseStorage _storage =
-      firebase_storage.FirebaseStorage.instance;
+class ProfileProvider with ChangeNotifier {
+  User? _user;
 
-  User? get user => _auth.currentUser;
+  User? get user => _user;
 
-  // Fetch user data based on role (karyawan or admin)
-  Stream<DocumentSnapshot> getUserData() async* {
-    final user = _auth.currentUser;
-    if (user == null) {
-      yield* const Stream.empty();
-      return;
-    }
-
-    // Get the 'karyawan_id' and 'role' from the 'users' collection
-    final userDoc = await _firestore.collection('users').doc(user.uid).get();
-    final karyawanId = userDoc.data()?['karyawan_id'] as String?;
-    final role = userDoc.data()?['role'] as String?;
-
-    if (karyawanId == null || role == null) {
-      yield* const Stream.empty();
-      return;
-    }
-
-    // Stream data from either 'karyawan' or 'admin' collection based on role
-    final collection = role == 'admin' ? 'admin' : 'karyawan';
-    yield* _firestore.collection(collection).doc(karyawanId).snapshots();
+  ProfileProvider() {
+    FirebaseAuth.instance.authStateChanges().listen((User? user) {
+      _user = user;
+      notifyListeners();
+    });
   }
 
-  // Update user profile in the appropriate collection (karyawan or admin)
+  Stream<DocumentSnapshot> getUserData() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return Stream.error(Exception('No user is currently signed in'));
+    }
+
+    return FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .snapshots()
+        .asyncMap((userDoc) async {
+      if (!userDoc.exists) {
+        throw Exception('User document not found');
+      }
+
+      final role = userDoc.data()?['role'] as String?;
+      final adminId = userDoc.data()?['admin_id'] as String?;
+      final karyawanId = userDoc.data()?['karyawan_id'] as String?;
+
+      if (role == null) {
+        throw Exception('User role not found');
+      }
+
+      final collection = role == 'admin' ? 'admin' : 'karyawan';
+      final docId = role == 'admin' ? adminId : karyawanId;
+
+      if (docId == null) {
+        throw Exception(
+            role == 'admin' ? 'Admin ID not found' : 'Karyawan ID not found');
+      }
+
+      return FirebaseFirestore.instance
+          .collection(collection)
+          .doc(docId)
+          .snapshots();
+    }).switchMap((stream) => stream);
+  }
+
   Future<void> updateUserProfile({
     String? name,
     String? phoneNumber,
@@ -44,99 +60,63 @@ class ProfileProvider extends ChangeNotifier {
     String? address,
     String? gender,
     String? age,
+    String? photoUrl,
   }) async {
-    final user = _auth.currentUser;
+    final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       throw Exception('No user is currently signed in');
     }
 
-    // Get the 'karyawan_id' and 'role' from the 'users' collection
-    final userDoc = await _firestore.collection('users').doc(user.uid).get();
-    final karyawanId = userDoc.data()?['karyawan_id'] as String?;
+    // Get user role and ID from users collection
+    final userDoc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .get();
     final role = userDoc.data()?['role'] as String?;
+    final adminId = userDoc.data()?['admin_id'] as String?;
+    final karyawanId = userDoc.data()?['karyawan_id'] as String?;
 
-    if (karyawanId == null || role == null) {
-      throw Exception('No karyawan_id or role found for the user');
+    if (role == null) {
+      throw Exception('User role not found');
     }
 
-    // Determine the target collection based on role
     final collection = role == 'admin' ? 'admin' : 'karyawan';
+    final docId = role == 'admin' ? adminId : karyawanId;
 
-    // Prepare updated data
-    Map<String, dynamic> updatedData = {};
-
-    if (name != null && name.isNotEmpty) {
-      updatedData['nama'] = name;
-    }
-    if (phoneNumber != null && phoneNumber.isNotEmpty) {
-      updatedData['phoneNumber'] = phoneNumber;
-    }
-    if (address != null && address.isNotEmpty) {
-      updatedData['alamat'] = address;
-    }
-    if (gender != null && gender.isNotEmpty) {
-      updatedData['gender'] = gender;
-    }
-    if (age != null && age.isNotEmpty) {
-      updatedData['age'] = age;
-    }
-    if (role.isNotEmpty) {
-      updatedData['posisi'] = role; // Ensure posisi matches role
+    if (docId == null) {
+      throw Exception(
+          role == 'admin' ? 'Admin ID not found' : 'Karyawan ID not found');
     }
 
-    // Update the appropriate collection if there are changes
-    if (updatedData.isNotEmpty) {
-      await _firestore
+    // Prepare update data for Firestore
+    final updateData = <String, dynamic>{};
+    if (name != null && name.isNotEmpty) updateData['nama'] = name;
+    if (phoneNumber != null && phoneNumber.isNotEmpty)
+      updateData['phoneNumber'] = phoneNumber; // Fixed null safety issue
+    if (address != null) updateData['alamat'] = address;
+    if (gender != null) updateData['gender'] = gender;
+    if (age != null) updateData['age'] = age;
+    if (photoUrl != null) updateData['foto'] = photoUrl;
+
+    // Update Firestore document
+    if (updateData.isNotEmpty) {
+      await FirebaseFirestore.instance
           .collection(collection)
-          .doc(karyawanId)
-          .update(updatedData);
+          .doc(docId)
+          .update(updateData);
     }
 
-    // Update Firebase Auth profile if needed
+    // Update Firebase Authentication profile
     if (name != null && name.isNotEmpty) {
       await user.updateDisplayName(name);
+    }
+    if (photoUrl != null) {
+      await user.updatePhotoURL(photoUrl);
     }
     if (password != null && password.isNotEmpty) {
       await user.updatePassword(password);
     }
 
     notifyListeners();
-  }
-
-  // Update profile picture in Firebase Storage and the appropriate collection
-  Future<String> updateProfilePicture(String imagePath) async {
-    final user = _auth.currentUser;
-    if (user == null) {
-      throw Exception('No user is currently signed in');
-    }
-
-    // Get the 'karyawan_id' and 'role' from the 'users' collection
-    final userDoc = await _firestore.collection('users').doc(user.uid).get();
-    final karyawanId = userDoc.data()?['karyawan_id'] as String?;
-    final role = userDoc.data()?['role'] as String?;
-
-    if (karyawanId == null || role == null) {
-      throw Exception('No karyawan_id or role found for the user');
-    }
-
-    // Determine the target collection based on role
-    final collection = role == 'admin' ? 'admin' : 'karyawan';
-
-    // Upload image to Firebase Storage
-    File image = File(imagePath);
-    final ref = _storage.ref().child('profile_pictures/$karyawanId.jpg');
-    await ref.putFile(image);
-    final url = await ref.getDownloadURL();
-
-    // Update the 'foto' field in the appropriate collection
-    await _firestore.collection(collection).doc(karyawanId).update({
-      'foto': url,
-    });
-
-    // Update Firebase Auth profile
-    await user.updatePhotoURL(url);
-
-    notifyListeners();
-    return url;
   }
 }

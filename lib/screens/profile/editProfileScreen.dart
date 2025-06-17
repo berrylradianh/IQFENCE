@@ -3,10 +3,15 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:googleapis/drive/v3.dart' as drive;
+import 'package:googleapis_auth/auth_io.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:iqfence/components/custom_text_field.dart';
+import 'package:iqfence/config/drive_config.dart';
 import 'package:iqfence/providers/profileProvider.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 
 class EditProfileScreen extends StatefulWidget {
@@ -18,6 +23,7 @@ class EditProfileScreen extends StatefulWidget {
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
   File? _imageFile;
+  String? _imageUrl;
   final _picker = ImagePicker();
   late TextEditingController _nameController;
   late TextEditingController _phoneController;
@@ -27,6 +33,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late TextEditingController _genderController;
   late TextEditingController _ageController;
   late Future<Map<String, dynamic>> _userDataFuture;
+
+  // Function to convert Google Drive URL to direct image URL
+  String _getDirectImageUrl(String url) {
+    final RegExp regExp = RegExp(r'file/d/([a-zA-Z0-9_-]+)/');
+    final match = regExp.firstMatch(url);
+    if (match != null) {
+      final fileId = match.group(1);
+      return 'https://drive.google.com/uc?export=view&id=$fileId';
+    }
+    return url;
+  }
 
   @override
   void initState() {
@@ -48,31 +65,35 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       return {};
     }
 
-    // Get user role and karyawan_id from users collection
+    // Get user role and ID from users collection
     final userDoc = await FirebaseFirestore.instance
         .collection('users')
         .doc(user.uid)
         .get();
-    final karyawanId = userDoc.data()?['karyawan_id'] as String?;
     final role = userDoc.data()?['role'] as String?;
+    final adminId = userDoc.data()?['admin_id'] as String?;
+    final karyawanId = userDoc.data()?['karyawan_id'] as String?;
 
-    if (karyawanId == null || role == null) {
+    if (role == null) {
+      return {};
+    }
+
+    final collection = role == 'admin' ? 'admin' : 'karyawan';
+    final docId = role == 'admin' ? adminId : karyawanId;
+
+    if (docId == null) {
       return {};
     }
 
     // Check if user document exists in admin or karyawan collection
-    final collection = role == 'admin' ? 'admin' : 'karyawan';
     final profileDoc = await FirebaseFirestore.instance
         .collection(collection)
-        .doc(karyawanId)
+        .doc(docId)
         .get();
 
     if (!profileDoc.exists) {
       // Create a default document if it doesn't exist
-      await FirebaseFirestore.instance
-          .collection(collection)
-          .doc(karyawanId)
-          .set({
+      await FirebaseFirestore.instance.collection(collection).doc(docId).set({
         'nama': user.displayName ?? '',
         'phoneNumber': '',
         'alamat': '',
@@ -113,19 +134,91 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _addressController.text = data['alamat']?.toString() ?? '';
     _genderController.text = data['gender']?.toString() ?? '';
     _ageController.text = data['age']?.toString() ?? '';
+    _imageUrl = data['foto']?.toString();
 
     return data;
   }
 
-  Future<void> _getImage(ImageSource source) async {
-    final pickedFile = await _picker.pickImage(source: source);
-    setState(() {
-      if (pickedFile != null) {
-        _imageFile = File(pickedFile.path);
-      } else {
-        print('No image selected.');
+  Future<bool> _requestGalleryPermission() async {
+    final status = await Permission.photos.request();
+    if (status.isGranted) {
+      return true;
+    } else if (Platform.isAndroid) {
+      final storageStatus = await Permission.storage.request();
+      if (storageStatus.isGranted) {
+        return true;
       }
-    });
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+          content: Text('Izin galeri diperlukan untuk memilih gambar')),
+    );
+    return false;
+  }
+
+  Future<void> _getImage(ImageSource source) async {
+    try {
+      final hasPermission = await _requestGalleryPermission();
+      if (!hasPermission) return;
+
+      final pickedFile = await _picker.pickImage(source: source);
+      if (pickedFile != null) {
+        setState(() {
+          _imageFile = File(pickedFile.path);
+        });
+
+        // Mengunggah ke Google Drive
+        final authClient = await clientViaServiceAccount(credentials, scopes);
+        final driveApi = drive.DriveApi(authClient);
+
+        final fileName =
+            'profile_${FirebaseAuth.instance.currentUser!.uid}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        final driveFile = drive.File()
+          ..name = fileName
+          ..parents = [dotenv.env['GOOGLE_DRIVE_FOLDER_ID']!];
+
+        final fileContent = _imageFile!.openRead();
+        final media = drive.Media(fileContent, _imageFile!.lengthSync());
+
+        final uploadedFile = await driveApi.files.create(
+          driveFile,
+          uploadMedia: media,
+        );
+
+        // Mengatur izin publik
+        await driveApi.permissions.create(
+          drive.Permission()
+            ..type = 'anyone'
+            ..role = 'reader',
+          uploadedFile.id!,
+        );
+
+        // Mendapatkan URL publik
+        final fileInfo =
+            await driveApi.files.get(uploadedFile.id!, $fields: 'webViewLink');
+        final webViewLink = (fileInfo as drive.File).webViewLink;
+
+        setState(() {
+          _imageUrl = webViewLink;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content:
+                Text('Gambar berhasil diunggah ke Google Drive: $webViewLink'),
+            duration: const Duration(seconds: 5),
+          ),
+        );
+        print('Gambar diunggah ke Google Drive: $webViewLink');
+
+        authClient.close();
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error mengunggah gambar: $e')),
+      );
+      print('Error uploading image: $e');
+    }
   }
 
   Future<bool> _reauthenticateUser(BuildContext context) async {
@@ -192,31 +285,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     return reauthenticated;
   }
 
-  // Normalize phone number to 62 format for database
   String _normalizePhoneNumber(String phone) {
-    // Remove any non-digit characters (e.g., spaces, dashes, +)
     String cleaned = phone.replaceAll(RegExp(r'\D'), '');
 
-    // Handle different input formats
     if (cleaned.startsWith('62')) {
-      return cleaned; // Already starts with 62
+      return cleaned;
     } else if (cleaned.startsWith('0')) {
-      return '62${cleaned.substring(1)}'; // Replace leading 0 with 62
+      return '62${cleaned.substring(1)}';
     } else {
-      return '62$cleaned'; // Assume it's a local number without 0 or 62
+      return '62$cleaned';
     }
-  }
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _phoneController.dispose();
-    _emailController.dispose();
-    _passwordController.dispose();
-    _addressController.dispose();
-    _genderController.dispose();
-    _ageController.dispose();
-    super.dispose();
   }
 
   void _showLoadingDialog(BuildContext context) {
@@ -243,6 +321,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   void _hideLoadingDialog(BuildContext context) {
     Navigator.of(context, rootNavigator: true).pop();
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _phoneController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _addressController.dispose();
+    _genderController.dispose();
+    _ageController.dispose();
+    super.dispose();
   }
 
   @override
@@ -300,8 +390,28 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                       backgroundImage: FileImage(_imageFile!),
                                     ),
                                   )
-                                : profile.user?.photoURL == null
+                                : _imageUrl != null && _imageUrl!.isNotEmpty
                                     ? Container(
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: Colors.blue,
+                                            width: 3,
+                                          ),
+                                        ),
+                                        child: CircleAvatar(
+                                          radius: 70,
+                                          backgroundImage: NetworkImage(
+                                            _getDirectImageUrl(_imageUrl!),
+                                          ),
+                                          onBackgroundImageError:
+                                              (error, stackTrace) {
+                                            print(
+                                                'Error loading image: $error');
+                                          },
+                                        ),
+                                      )
+                                    : Container(
                                         decoration: BoxDecoration(
                                           shape: BoxShape.circle,
                                           border: Border.all(
@@ -317,20 +427,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                             color: Colors.white,
                                             size: 100,
                                           ),
-                                        ),
-                                      )
-                                    : Container(
-                                        decoration: BoxDecoration(
-                                          shape: BoxShape.circle,
-                                          border: Border.all(
-                                            color: Colors.blue,
-                                            width: 3,
-                                          ),
-                                        ),
-                                        child: CircleAvatar(
-                                          radius: 70,
-                                          backgroundImage: NetworkImage(
-                                              profile.user!.photoURL!),
                                         ),
                                       ),
                             Positioned(
@@ -364,6 +460,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           ],
                         ),
                       ),
+                      if (_imageUrl != null)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 8),
+                        ),
                       const SizedBox(height: 20),
                       CustomTextField(
                         controller: _nameController,
@@ -374,7 +474,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       const Text(
                         'Alamat',
                         style: TextStyle(
-                            fontWeight: FontWeight.w600, fontSize: 16.0),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 16.0,
+                        ),
                       ),
                       const SizedBox(height: 10.0),
                       SizedBox(
@@ -393,7 +495,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       const Text(
                         'Jenis Kelamin',
                         style: TextStyle(
-                            fontWeight: FontWeight.w600, fontSize: 16.0),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 16.0,
+                        ),
                       ),
                       const SizedBox(height: 10.0),
                       Container(
@@ -468,16 +572,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         onPressed: () async {
                           try {
                             if (_passwordController.text.isNotEmpty ||
-                                _imageFile != null) {
+                                _imageUrl != null) {
                               if (!await _reauthenticateUser(context)) {
                                 return;
                               }
                             }
                             _showLoadingDialog(context);
-                            if (_imageFile != null) {
-                              await profile
-                                  .updateProfilePicture(_imageFile!.path);
-                            }
                             // Normalize phone number before updating
                             final normalizedPhone =
                                 _normalizePhoneNumber(_phoneController.text);
@@ -490,6 +590,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               address: _addressController.text,
                               gender: _genderController.text,
                               age: _ageController.text,
+                              photoUrl: _imageUrl,
                             );
                             _hideLoadingDialog(context);
                             ScaffoldMessenger.of(context).showSnackBar(

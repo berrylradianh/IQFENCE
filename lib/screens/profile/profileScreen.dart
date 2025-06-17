@@ -12,6 +12,17 @@ import '../../providers/Auth.dart';
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
+  // Function to convert Google Drive URL to direct image URL
+  String _getDirectImageUrl(String url) {
+    final RegExp regExp = RegExp(r'file/d/([a-zA-Z0-9_-]+)/');
+    final match = regExp.firstMatch(url);
+    if (match != null) {
+      final fileId = match.group(1);
+      return 'https://drive.google.com/uc?export=view&id=$fileId';
+    }
+    return url;
+  }
+
   void _showLogoutDialog(BuildContext context, Auth auth) {
     showDialog(
       context: context,
@@ -78,7 +89,7 @@ class ProfileScreen extends StatelessWidget {
           builder:
               (BuildContext context, AsyncSnapshot<DocumentSnapshot> snapshot) {
             if (snapshot.hasError) {
-              return const Center(child: Text('Something went wrong'));
+              return Center(child: Text('Error: ${snapshot.error}'));
             }
 
             if (snapshot.connectionState == ConnectionState.waiting) {
@@ -92,12 +103,17 @@ class ProfileScreen extends StatelessWidget {
             Map<String, dynamic> data =
                 snapshot.data!.data() as Map<String, dynamic>;
 
+            // Convert the photo URL
+            final imageUrl = data['foto'] != null && data['foto'].isNotEmpty
+                ? _getDirectImageUrl(data['foto'])
+                : null;
+
             return Column(
               children: [
                 const SizedBox(height: 20),
                 Stack(
                   children: [
-                    profile.user?.photoURL == null
+                    imageUrl == null
                         ? Container(
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
@@ -126,8 +142,11 @@ class ProfileScreen extends StatelessWidget {
                             ),
                             child: CircleAvatar(
                               radius: 70,
-                              backgroundImage:
-                                  NetworkImage(profile.user!.photoURL!),
+                              backgroundImage: NetworkImage(imageUrl),
+                              onBackgroundImageError: (error, stackTrace) {
+                                // Optional: Handle image loading errors
+                                print('Error loading image: $error');
+                              },
                             ),
                           ),
                     Positioned(
