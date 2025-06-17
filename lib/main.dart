@@ -4,13 +4,24 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:iqfence/providers/Auth.dart';
 import 'package:iqfence/providers/profileProvider.dart';
 import 'package:iqfence/screens/opening/hello_screen.dart';
+import 'package:iqfence/service/auth_service.dart';
+import 'package:iqfence/service/firestore_service.dart';
+import 'package:iqfence/service/google_drive_service.dart';
 import 'package:provider/provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
-  await dotenv.load(fileName: ".env");
-  runApp(const MyApp());
+  try {
+    await Firebase.initializeApp();
+    await dotenv.load(fileName: ".env");
+    runApp(const MyApp());
+  } catch (e) {
+    runApp(MaterialApp(
+      home: Scaffold(
+        body: Center(child: Text('Initialization failed: $e')),
+      ),
+    ));
+  }
 }
 
 class MyApp extends StatelessWidget {
@@ -21,8 +32,15 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => Auth()),
-        ChangeNotifierProvider(create: (_) => ProfileProvider()),
-        // Tambahkan provider lain jika perlu
+        Provider(create: (_) => AuthService()),
+        Provider(create: (_) => FirestoreService()),
+        Provider(create: (_) => GoogleDriveService()),
+        ChangeNotifierProvider(
+          create: (context) => ProfileProvider(
+            context.read<AuthService>(),
+            context.read<FirestoreService>(),
+          ),
+        ),
       ],
       child: MaterialApp(
         title: 'IQFence',

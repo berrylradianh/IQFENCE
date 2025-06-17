@@ -1,27 +1,16 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:iqfence/models/user_profile.dart'; // Added import for UserProfile
+import 'package:iqfence/providers/Auth.dart';
 import 'package:iqfence/providers/profileProvider.dart';
 import 'package:iqfence/screens/opening/hello_screen.dart';
 import 'package:iqfence/screens/profile/editProfileScreen.dart';
+import 'package:iqfence/service/google_drive_service.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:provider/provider.dart';
 
-import '../../providers/Auth.dart';
-
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
-
-  // Function to convert Google Drive URL to direct image URL
-  String _getDirectImageUrl(String url) {
-    final RegExp regExp = RegExp(r'file/d/([a-zA-Z0-9_-]+)/');
-    final match = regExp.firstMatch(url);
-    if (match != null) {
-      final fileId = match.group(1);
-      return 'https://drive.google.com/uc?export=view&id=$fileId';
-    }
-    return url;
-  }
 
   void _showLogoutDialog(BuildContext context, Auth auth) {
     showDialog(
@@ -60,6 +49,8 @@ class ProfileScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final auth = Provider.of<Auth>(context, listen: false);
     final profile = Provider.of<ProfileProvider>(context, listen: false);
+    final googleDriveService =
+        Provider.of<GoogleDriveService>(context, listen: false);
     final user = FirebaseAuth.instance.currentUser;
 
     // Check if user is null (not logged in)
@@ -84,10 +75,9 @@ class ProfileScreen extends StatelessWidget {
       ),
       body: Padding(
         padding: const EdgeInsets.all(10.0),
-        child: StreamBuilder<DocumentSnapshot>(
+        child: StreamBuilder<UserProfile>(
           stream: profile.getUserData(),
-          builder:
-              (BuildContext context, AsyncSnapshot<DocumentSnapshot> snapshot) {
+          builder: (BuildContext context, AsyncSnapshot<UserProfile> snapshot) {
             if (snapshot.hasError) {
               return Center(child: Text('Error: ${snapshot.error}'));
             }
@@ -96,16 +86,14 @@ class ProfileScreen extends StatelessWidget {
               return const Center(child: CircularProgressIndicator());
             }
 
-            if (!snapshot.hasData || !snapshot.data!.exists) {
+            if (!snapshot.hasData) {
               return const Center(child: Text('User data not found'));
             }
 
-            Map<String, dynamic> data =
-                snapshot.data!.data() as Map<String, dynamic>;
-
-            // Convert the photo URL
-            final imageUrl = data['foto'] != null && data['foto'].isNotEmpty
-                ? _getDirectImageUrl(data['foto'])
+            final userProfile = snapshot.data!;
+            final imageUrl = userProfile.photoUrl != null &&
+                    userProfile.photoUrl!.isNotEmpty
+                ? googleDriveService.getDirectImageUrl(userProfile.photoUrl!)
                 : null;
 
             return Column(
@@ -144,7 +132,6 @@ class ProfileScreen extends StatelessWidget {
                               radius: 70,
                               backgroundImage: NetworkImage(imageUrl),
                               onBackgroundImageError: (error, stackTrace) {
-                                // Optional: Handle image loading errors
                                 print('Error loading image: $error');
                               },
                             ),
@@ -186,7 +173,7 @@ class ProfileScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 20),
                 Text(
-                  data['nama'] ?? 'No Name',
+                  userProfile.name ?? 'No Name',
                   style: const TextStyle(
                     fontSize: 22.0,
                     fontWeight: FontWeight.bold,
