@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -42,16 +43,66 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   Future<Map<String, dynamic>> _loadUserData() async {
     final profile = Provider.of<ProfileProvider>(context, listen: false);
-    final userDoc = await profile.getUserData().first;
-    if (!userDoc.exists) {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
       return {};
     }
-    var data = userDoc.data() as Map<String, dynamic>? ?? {};
 
-    _nameController.text = data['displayName']?.toString() ?? '';
+    // Get user role and karyawan_id from users collection
+    final userDoc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .get();
+    final karyawanId = userDoc.data()?['karyawan_id'] as String?;
+    final role = userDoc.data()?['role'] as String?;
+
+    if (karyawanId == null || role == null) {
+      return {};
+    }
+
+    // Check if user document exists in admin or karyawan collection
+    final collection = role == 'admin' ? 'admin' : 'karyawan';
+    final profileDoc = await FirebaseFirestore.instance
+        .collection(collection)
+        .doc(karyawanId)
+        .get();
+
+    if (!profileDoc.exists) {
+      // Create a default document if it doesn't exist
+      await FirebaseFirestore.instance
+          .collection(collection)
+          .doc(karyawanId)
+          .set({
+        'nama': user.displayName ?? '',
+        'phoneNumber': '',
+        'alamat': '',
+        'gender': '',
+        'age': '',
+        'foto': user.photoURL ?? '',
+        'jam_kerja': '',
+        'location_ids': [],
+        'posisi': role,
+      });
+    }
+
+    final data = profileDoc.exists
+        ? (profileDoc.data() ?? {})
+        : {
+            'nama': user.displayName ?? '',
+            'phoneNumber': '',
+            'alamat': '',
+            'gender': '',
+            'age': '',
+            'foto': user.photoURL ?? '',
+            'jam_kerja': '',
+            'location_ids': [],
+            'posisi': role,
+          };
+
+    _nameController.text = data['nama']?.toString() ?? '';
     _phoneController.text = data['phoneNumber']?.toString() ?? '';
-    _emailController.text = data['email']?.toString() ?? '';
-    _addressController.text = data['address']?.toString() ?? '';
+    _emailController.text = user.email ?? '';
+    _addressController.text = data['alamat']?.toString() ?? '';
     _genderController.text = data['gender']?.toString() ?? '';
     _ageController.text = data['age']?.toString() ?? '';
 
@@ -80,8 +131,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       context: context,
       barrierDismissible: false,
       builder: (BuildContext dialogContext) {
-        final passwordController =
-            TextEditingController(); // Create controller here
+        final passwordController = TextEditingController();
         return AlertDialog(
           title: const Text('Re-authentication Required'),
           content: Column(
@@ -102,7 +152,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           actions: [
             TextButton(
               onPressed: () {
-                passwordController.dispose(); // Dispose on cancel
+                passwordController.dispose();
                 Navigator.of(dialogContext).pop();
               },
               child: const Text('Cancel'),
@@ -116,7 +166,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   );
                   await user.reauthenticateWithCredential(credential);
                   reauthenticated = true;
-                  passwordController.dispose(); // Dispose on success
+                  passwordController.dispose();
                   Navigator.of(dialogContext).pop();
                 } catch (e) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -198,9 +248,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           } else if (snapshot.hasError) {
-            return const Center(child: Text('Error loading user data'));
-          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text('No user data available'));
+            return Center(
+                child: Text('Error loading user data: ${snapshot.error}'));
           } else {
             return Center(
               child: Padding(
@@ -214,26 +263,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       Center(
                         child: Stack(
                           children: [
-                            profile.user.photoURL == null
+                            _imageFile != null
                                 ? Container(
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: Colors.blue,
-                                        width: 3,
-                                      ),
-                                    ),
-                                    child: const CircleAvatar(
-                                      radius: 70,
-                                      backgroundColor: Colors.blue,
-                                      child: Icon(
-                                        Icons.person,
-                                        color: Colors.white,
-                                        size: 100,
-                                      ),
-                                    ),
-                                  )
-                                : Container(
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
                                       border: Border.all(
@@ -243,22 +274,48 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                     ),
                                     child: CircleAvatar(
                                       radius: 70,
-                                      backgroundImage:
-                                          NetworkImage(profile.user.photoURL!),
+                                      backgroundImage: FileImage(_imageFile!),
                                     ),
-                                  ),
+                                  )
+                                : profile.user?.photoURL == null
+                                    ? Container(
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: Colors.blue,
+                                            width: 3,
+                                          ),
+                                        ),
+                                        child: const CircleAvatar(
+                                          radius: 70,
+                                          backgroundColor: Colors.blue,
+                                          child: Icon(
+                                            Icons.person,
+                                            color: Colors.white,
+                                            size: 100,
+                                          ),
+                                        ),
+                                      )
+                                    : Container(
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: Colors.blue,
+                                            width: 3,
+                                          ),
+                                        ),
+                                        child: CircleAvatar(
+                                          radius: 70,
+                                          backgroundImage: NetworkImage(
+                                              profile.user!.photoURL!),
+                                        ),
+                                      ),
                             Positioned(
                               right: 0,
                               bottom: 0,
                               child: GestureDetector(
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) =>
-                                          const EditProfileScreen(),
-                                    ),
-                                  );
+                                onTap: () async {
+                                  await _getImage(ImageSource.gallery);
                                 },
                                 child: Container(
                                   decoration: const BoxDecoration(
@@ -298,10 +355,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       ),
                       const SizedBox(height: 10.0),
                       SizedBox(
-                        height: 100, // Limit address field height
+                        height: 100,
                         child: TextField(
                           controller: _addressController,
-                          maxLines: 3, // Limit lines to prevent overflow
+                          maxLines: 3,
                           decoration: const InputDecoration(
                             hintText: 'Masukkan alamat Anda di sini',
                             border: OutlineInputBorder(),

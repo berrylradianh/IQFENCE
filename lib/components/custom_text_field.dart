@@ -59,30 +59,49 @@ class CustomTextField extends StatelessWidget {
                       )
                     : null,
                 prefixIcon: isPhone
-                    ? SizedBox(
-                        width: 80, // Adjust this value based on your needs
+                    ? Container(
+                        width: 90, // Fixed width for consistency
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8.0, vertical: 4.0),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Image.asset(
-                              'assets/indonesian_flag.png',
-                              width: 24, // Constrain image size
-                              height: 24,
+                            Container(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(4.0),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.1),
+                                    blurRadius: 2,
+                                    offset: const Offset(0, 1),
+                                  ),
+                                ],
+                              ),
+                              margin: const EdgeInsets.only(right: 8.0),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(4.0),
+                                child: Image.asset(
+                                  'assets/indonesian_flag.png',
+                                  width: 24,
+                                  height: 16,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
                             ),
-                            const Text(
+                            Text(
                               '+62',
                               style: TextStyle(
                                 fontSize: 14.0,
                                 fontWeight: FontWeight.w600,
+                                color: Colors.grey[800],
                               ),
                             ),
-                            const SizedBox(width: 5), // Reduce spacing
+                            const SizedBox(width: 8.0),
                             Container(
                               width: 1,
-                              height: 20,
-                              color: Colors.grey,
+                              height: 24,
+                              color: Colors.grey[400],
                             ),
-                            const SizedBox(width: 5), // Reduce spacing
                           ],
                         ),
                       )

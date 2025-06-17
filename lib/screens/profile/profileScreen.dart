@@ -48,8 +48,8 @@ class ProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final auth = Provider.of<Auth>(context, listen: false);
-    final user = FirebaseAuth.instance.currentUser;
     final profile = Provider.of<ProfileProvider>(context, listen: false);
+    final user = FirebaseAuth.instance.currentUser;
 
     // Check if user is null (not logged in)
     if (user == null) {
@@ -74,10 +74,7 @@ class ProfileScreen extends StatelessWidget {
       body: Padding(
         padding: const EdgeInsets.all(10.0),
         child: StreamBuilder<DocumentSnapshot>(
-          stream: FirebaseFirestore.instance
-              .collection('users')
-              .doc(user.uid)
-              .snapshots(),
+          stream: profile.getUserData(),
           builder:
               (BuildContext context, AsyncSnapshot<DocumentSnapshot> snapshot) {
             if (snapshot.hasError) {
@@ -100,7 +97,7 @@ class ProfileScreen extends StatelessWidget {
                 const SizedBox(height: 20),
                 Stack(
                   children: [
-                    profile.user.photoURL == null
+                    profile.user?.photoURL == null
                         ? Container(
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
@@ -130,7 +127,7 @@ class ProfileScreen extends StatelessWidget {
                             child: CircleAvatar(
                               radius: 70,
                               backgroundImage:
-                                  NetworkImage(profile.user.photoURL!),
+                                  NetworkImage(profile.user!.photoURL!),
                             ),
                           ),
                     Positioned(
@@ -170,7 +167,7 @@ class ProfileScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 20),
                 Text(
-                  data['displayName'] ?? 'No Name',
+                  data['nama'] ?? 'No Name',
                   style: const TextStyle(
                     fontSize: 22.0,
                     fontWeight: FontWeight.bold,
