@@ -18,7 +18,6 @@ class _KelolaKaryawanScreenState extends State<KelolaKaryawanScreen> {
   @override
   void initState() {
     super.initState();
-    // Listener untuk memperbarui query pencarian saat teks berubah
     _searchController.addListener(() {
       setState(() {
         _searchQuery = _searchController.text.toLowerCase();
@@ -26,7 +25,17 @@ class _KelolaKaryawanScreenState extends State<KelolaKaryawanScreen> {
     });
   }
 
-  // Fungsi untuk menampilkan dialog konfirmasi hapus
+  // Fungsi untuk mengubah URL Google Drive ke URL akses langsung
+  String _getDirectImageUrl(String url) {
+    final RegExp regExp = RegExp(r'file/d/([a-zA-Z0-9_-]+)/');
+    final match = regExp.firstMatch(url);
+    if (match != null) {
+      final fileId = match.group(1);
+      return 'https://drive.google.com/uc?export=view&id=$fileId';
+    }
+    return url;
+  }
+
   Future<bool?> _showDeleteConfirmationDialog(BuildContext context) async {
     return showDialog<bool>(
       context: context,
@@ -58,7 +67,6 @@ class _KelolaKaryawanScreenState extends State<KelolaKaryawanScreen> {
     );
   }
 
-  // Fungsi untuk menghapus karyawan dari Firestore
   Future<void> _deleteKaryawan(BuildContext context, String docId) async {
     try {
       await FirebaseFirestore.instance
@@ -91,7 +99,6 @@ class _KelolaKaryawanScreenState extends State<KelolaKaryawanScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Search Bar dan Tombol Tambah
             Row(
               children: [
                 Expanded(
@@ -155,7 +162,6 @@ class _KelolaKaryawanScreenState extends State<KelolaKaryawanScreen> {
                     return const Center(child: Text('Tidak ada data karyawan'));
                   }
 
-                  // Filter karyawan berdasarkan query pencarian
                   final karyawanDocs = snapshot.data!.docs.where((doc) {
                     final karyawan = doc.data() as Map<String, dynamic>;
                     final nama = (karyawan['nama'] ?? '').toLowerCase();
@@ -172,9 +178,8 @@ class _KelolaKaryawanScreenState extends State<KelolaKaryawanScreen> {
                     itemBuilder: (context, index) {
                       final doc = karyawanDocs[index];
                       final karyawan = doc.data() as Map<String, dynamic>;
-                      final imagePath = karyawan['foto'] != null
-                          ? 'assets/${karyawan['foto']}'
-                          : 'assets/placeholder.png';
+                      final imagePath =
+                          karyawan['foto'] ?? 'assets/placeholder.png';
 
                       return Card(
                         margin: const EdgeInsets.only(bottom: 16),
@@ -186,11 +191,10 @@ class _KelolaKaryawanScreenState extends State<KelolaKaryawanScreen> {
                           padding: const EdgeInsets.all(12),
                           child: Row(
                             children: [
-                              // Foto
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(12),
-                                child: Image.asset(
-                                  imagePath,
+                                child: Image.network(
+                                  _getDirectImageUrl(imagePath),
                                   width: 60,
                                   height: 60,
                                   fit: BoxFit.cover,
@@ -205,7 +209,6 @@ class _KelolaKaryawanScreenState extends State<KelolaKaryawanScreen> {
                                 ),
                               ),
                               const SizedBox(width: 12),
-                              // Info
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -235,7 +238,6 @@ class _KelolaKaryawanScreenState extends State<KelolaKaryawanScreen> {
                                   ],
                                 ),
                               ),
-                              // Tombol
                               Column(
                                 children: [
                                   ElevatedButton.icon(

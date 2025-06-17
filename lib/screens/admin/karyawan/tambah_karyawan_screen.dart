@@ -3,8 +3,11 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:googleapis/drive/v3.dart' as drive;
+import 'package:googleapis_auth/auth_io.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
+import 'package:iqfence/config/drive_config.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 class TambahKaryawanScreen extends StatefulWidget {
@@ -46,7 +49,7 @@ class _TambahKaryawanScreenState extends State<TambahKaryawanScreen> {
     'Minggu': false,
   };
   File? _selectedImage;
-  String? _imagePath;
+  String? _imageUrl;
   bool _isLoading = false;
   final ImagePicker _picker = ImagePicker();
   List<Map<String, dynamic>> _locations = [];
@@ -106,37 +109,55 @@ class _TambahKaryawanScreenState extends State<TambahKaryawanScreen> {
           _selectedImage = File(pickedFile.path);
         });
 
-        final appDir = await getApplicationDocumentsDirectory();
-        final karyawanDir = Directory('${appDir.path}/karyawan');
-
-        if (!await karyawanDir.exists()) {
-          await karyawanDir.create(recursive: true);
-        }
+        // Mengunggah ke Google Drive
+        final authClient = await clientViaServiceAccount(credentials, scopes);
+        final driveApi = drive.DriveApi(authClient);
 
         final fileName =
             'karyawan_${DateTime.now().millisecondsSinceEpoch}.jpg';
-        final savedImage =
-            await _selectedImage!.copy('${karyawanDir.path}/$fileName');
+        final driveFile = drive.File()
+          ..name = fileName
+          ..parents = [dotenv.env['GOOGLE_DRIVE_FOLDER_ID']!];
+
+        final fileContent = _selectedImage!.openRead();
+        final media = drive.Media(fileContent, _selectedImage!.lengthSync());
+
+        final uploadedFile = await driveApi.files.create(
+          driveFile,
+          uploadMedia: media,
+        );
+
+        // Mengatur izin publik
+        await driveApi.permissions.create(
+          drive.Permission()
+            ..type = 'anyone'
+            ..role = 'reader',
+          uploadedFile.id!,
+        );
+
+        // Mendapatkan URL publik
+        final fileInfo =
+            await driveApi.files.get(uploadedFile.id!, $fields: 'webViewLink');
+        final webViewLink = (fileInfo as drive.File).webViewLink;
 
         setState(() {
-          _imagePath = 'karyawan/$fileName';
+          _imageUrl = webViewLink;
         });
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              'Gambar disimpan di: ${savedImage.path}. '
-              'Silakan salin file ke folder proyek assets/karyawan/ '
-              'dan pastikan assets/karyawan/ dideklarasikan di pubspec.yaml',
-            ),
+            content:
+                Text('Gambar berhasil diunggah ke Google Drive: $webViewLink'),
             duration: const Duration(seconds: 5),
           ),
         );
-        print('Gambar disimpan di: ${savedImage.path}');
+        print('Gambar diunggah ke Google Drive: $webViewLink');
+
+        authClient.close();
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error memilih gambar: $e')),
+        SnackBar(content: Text('Error mengunggah gambar: $e')),
       );
     }
   }
@@ -165,9 +186,23 @@ class _TambahKaryawanScreenState extends State<TambahKaryawanScreen> {
   }
 
   Future<void> _tambahKaryawan() async {
-    if (FirebaseAuth.instance.currentUser == null) {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Silakan login terlebih dahulu')),
+      );
+      return;
+    }
+
+    // Periksa apakah pengguna adalah admin
+    final userDoc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .get();
+    if (!userDoc.exists || userDoc.data()?['role'] != 'admin') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Hanya admin yang dapat menambah karyawan')),
       );
       return;
     }
@@ -179,7 +214,7 @@ class _TambahKaryawanScreenState extends State<TambahKaryawanScreen> {
     if (nama.isEmpty ||
         alamat.isEmpty ||
         email.isEmpty ||
-        _imagePath == null ||
+        _imageUrl == null ||
         _selectedLocationIds.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -189,12 +224,26 @@ class _TambahKaryawanScreenState extends State<TambahKaryawanScreen> {
       return;
     }
 
+    // Minta kata sandi admin
+    final adminPassword = await _showPasswordDialog(context);
+    if (adminPassword == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Kata sandi diperlukan untuk melanjutkan')),
+      );
+      return;
+    }
+
+    if (!mounted) return; // Cek apakah widget masih mounted sebelum setState
     setState(() {
       _isLoading = true;
     });
 
     try {
-      // Tambah ke collection karyawan
+      // Simpan email admin
+      final adminEmail = user.email;
+
+      // Tambahkan data karyawan ke Firestore
       final jamKerja = _jamMulai.keys.map((hari) => MapEntry(
             hari,
             {
@@ -211,17 +260,16 @@ class _TambahKaryawanScreenState extends State<TambahKaryawanScreen> {
           await FirebaseFirestore.instance.collection('karyawan').add({
         'nama': nama,
         'alamat': alamat,
-        'foto': _imagePath,
+        'foto': _imageUrl,
         'posisi': 'Karyawan',
         'jam_kerja': Map.fromEntries(jamKerja),
         'location_ids': _selectedLocationIds,
       });
 
-      // Buat akun pengguna di Firebase Authentication
+      // Buat akun karyawan
       final userCredential = await FirebaseAuth.instance
           .createUserWithEmailAndPassword(email: email, password: 'password');
 
-      // Tambah ke collection users
       await FirebaseFirestore.instance
           .collection('users')
           .doc(userCredential.user!.uid)
@@ -232,20 +280,82 @@ class _TambahKaryawanScreenState extends State<TambahKaryawanScreen> {
         'role': 'karyawan',
       });
 
+      // Logout dari akun karyawan
+      await FirebaseAuth.instance.signOut();
+
+      // Login kembali ke akun admin
+      try {
+        await FirebaseAuth.instance.signInWithEmailAndPassword(
+          email: adminEmail!,
+          password: adminPassword,
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal login kembali sebagai admin: $e')),
+        );
+        return;
+      }
+
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Karyawan dan user berhasil ditambahkan')),
       );
 
-      Navigator.pop(context);
+      if (mounted) {
+        Navigator.pop(context);
+      }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: ${e.toString()}')),
       );
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
+  }
+
+// Fungsi untuk menampilkan dialog kata sandi
+  Future<String?> _showPasswordDialog(BuildContext context) async {
+    final TextEditingController passwordController = TextEditingController();
+    String? password;
+
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Masukkan Kata Sandi Admin'),
+          content: TextField(
+            controller: passwordController,
+            obscureText: true,
+            decoration: const InputDecoration(
+              labelText: 'Kata Sandi',
+              hintText: 'Masukkan kata sandi admin',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Batal'),
+            ),
+            TextButton(
+              onPressed: () {
+                password = passwordController.text.trim();
+                Navigator.pop(context);
+              },
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
+
+    passwordController.dispose();
+    return password;
   }
 
   @override
@@ -344,12 +454,13 @@ class _TambahKaryawanScreenState extends State<TambahKaryawanScreen> {
                           size: 40, color: Colors.grey),
                 ),
               ),
-              if (_selectedImage != null)
+              if (_imageUrl != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
                   child: Text(
-                    'Gambar dipilih: ${_imagePath?.split('/').last}',
+                    'Gambar diunggah: $_imageUrl',
                     style: const TextStyle(fontSize: 12),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               const SizedBox(height: 24),

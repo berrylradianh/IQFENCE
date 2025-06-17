@@ -46,7 +46,14 @@ dependencies:
   intl: ^0.19.0
   google_maps_flutter: ^2.9.0
   camera: ^0.10.0
-  
+  http: ^1.2.2
+  googleapis_auth: ^1.6.0
+  googleapis: ^13.2.0
+  flutter_dotenv: ^5.1.0
+  firebase_app_check: ^0.3.0
+  excel: ^2.0.0
+  pdf: ^3.8.0
+  open_file: ^3.2.0
 
 dev_dependencies:
   flutter_test:
@@ -81,6 +88,7 @@ flutter:
     - assets/indonesian_flag.png
     - assets/karyawan/
     - assets/placeholder.png
+    - .env
 
 
   # An image asset can refer to one or more resolution-specific "variants", see
