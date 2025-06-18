@@ -27,13 +27,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
       final userCredential = await FirebaseAuth.instance
           .createUserWithEmailAndPassword(email: email, password: password);
 
-      // Simpan role ke Firestore
+      // Tambahkan data karyawan ke Firestore
+      final karyawanDoc =
+          await FirebaseFirestore.instance.collection('karyawan').add({
+        'posisi': 'Karyawan',
+      });
+
+      // Simpan data user ke Firestore dengan karyawan_id
       await FirebaseFirestore.instance
           .collection('users')
           .doc(userCredential.user!.uid)
           .set({
         'email': email,
-        'role': 'user', // default role
+        'role': 'user',
+        'karyawan_id': karyawanDoc.id,
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -107,5 +114,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    emailController.dispose();
+    passwordController.dispose();
+    super.dispose();
   }
 }
