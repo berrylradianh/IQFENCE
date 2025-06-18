@@ -1,4 +1,5 @@
 class UserModel {
+  final String? id; // Changed to nullable
   final String email;
   final String role;
   final String? displayName;
@@ -7,6 +8,7 @@ class UserModel {
   final String? address;
 
   UserModel({
+    this.id, // Nullable
     required this.email,
     required this.role,
     this.displayName,
@@ -29,19 +31,24 @@ class UserModel {
 
   Map<String, dynamic> toJson() {
     return {
+      'id': id,
       'email': email,
       'role': role,
-      'displayName': capitalize(displayName!),
+      'displayName': displayName != null
+          ? capitalize(displayName!)
+          : null, // Safe handling
       'photoURL': photoURL,
       'phoneNumber': phoneNumber,
       'address': address,
     };
   }
 
-  factory UserModel.fromJson(Map<String, dynamic> data) {
+  factory UserModel.fromJson(String? id, Map<String, dynamic> data) {
+    // Nullable id parameter
     return UserModel(
-      email: data['email'],
-      role: data['role'],
+      id: id,
+      email: data['email'] ?? '',
+      role: data['role'] ?? '',
       displayName: data['displayName'],
       photoURL: data['photoURL'],
       phoneNumber: data['phoneNumber'],

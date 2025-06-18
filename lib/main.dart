@@ -1,6 +1,7 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:iqfence/providers/Auth.dart';
 import 'package:iqfence/providers/profileProvider.dart';
 import 'package:iqfence/screens/opening/hello_screen.dart';
@@ -46,6 +47,17 @@ class MyApp extends StatelessWidget {
         title: 'IQFence',
         theme: ThemeData(useMaterial3: false),
         home: const HelloScreen(),
+        // Add localization support
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: const [
+          Locale('en', 'US'), // English
+          Locale('id', 'ID'), // Indonesian
+        ],
+        locale: const Locale('id', 'ID'), // Set default locale to Indonesian
       ),
     );
   }

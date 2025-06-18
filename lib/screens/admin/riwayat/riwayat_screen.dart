@@ -1,8 +1,9 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:intl/intl.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:iqfence/models/userModel.dart';
+import 'package:iqfence/screens/admin/riwayat/presensi_result_screen.dart';
+import 'package:iqfence/service/firestore_service.dart';
+import 'package:iqfence/utils/date_utils.dart' as CustomDateUtils;
 
 class AdminRiwayatScreen extends StatefulWidget {
   const AdminRiwayatScreen({super.key});
@@ -12,9 +13,11 @@ class AdminRiwayatScreen extends StatefulWidget {
 }
 
 class _AdminRiwayatScreenState extends State<AdminRiwayatScreen> {
-  String? _selectedUserId;
-  List<Map<String, dynamic>> _users = [];
   final TextEditingController _searchController = TextEditingController();
+  final FirestoreService _firestoreService = FirestoreService();
+  List<UserModel> _users = [];
+  UserModel? _selectedUser;
+  DateTimeRange? _selectedDateRange;
 
   @override
   void initState() {
@@ -23,47 +26,70 @@ class _AdminRiwayatScreenState extends State<AdminRiwayatScreen> {
     _fetchUsers();
   }
 
-  // Ambil data semua user dan nama dari karyawan jika nama di users null
   Future<void> _fetchUsers() async {
     try {
-      final userSnapshot =
-          await FirebaseFirestore.instance.collection('users').get();
-      List<Map<String, dynamic>> users = [];
-
-      for (var doc in userSnapshot.docs) {
-        final userData = doc.data();
-        String name = userData['nama'] ?? '';
-        final karyawanId = userData['karyawan_id'] ?? '';
-
-        // Jika nama null dan ada karyawan_id, ambil nama dari koleksi karyawan
-        if (name.isEmpty && karyawanId.isNotEmpty) {
-          final karyawanDoc = await FirebaseFirestore.instance
-              .collection('karyawan')
-              .doc(karyawanId)
-              .get();
-          if (karyawanDoc.exists) {
-            name = karyawanDoc.data()?['nama'] ?? 'Unknown';
-          }
-        }
-
-        // Jika masih kosong, set default 'Unknown'
-        name = name.isEmpty ? 'Unknown' : name;
-
-        users.add({
-          'id': doc.id,
-          'name': name,
-          'email': userData['email'] ?? '',
-        });
-      }
-
+      final users = await _firestoreService.getAllUsers();
+      print('AdminRiwayatScreen fetched users: ${users.map((u) => {
+            'id': u.id,
+            'displayName': u.displayName
+          }).toList()}');
       setState(() {
         _users = users;
       });
     } catch (e) {
+      print('Error in _fetchUsers: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error fetching users: $e')),
       );
     }
+  }
+
+  Future<void> _selectDateRange(BuildContext context) async {
+    final DateTimeRange? picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2000),
+      lastDate: DateTime.now(),
+      initialDateRange: _selectedDateRange,
+      locale: const Locale('id', 'ID'),
+    );
+    if (picked != null && picked != _selectedDateRange) {
+      setState(() {
+        _selectedDateRange = picked;
+      });
+    }
+  }
+
+  void _onSubmit() {
+    if (_selectedUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Pilih karyawan terlebih dahulu')),
+      );
+      return;
+    }
+    if (_selectedUser!.id == null) {
+      print('Error: Selected user has null ID: $_selectedUser');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error: ID karyawan tidak tersedia')),
+      );
+      return;
+    }
+    if (_selectedDateRange == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Pilih rentang tanggal terlebih dahulu')),
+      );
+      return;
+    }
+    print(
+        'Navigating to PresensiResultScreen with user ID: ${_selectedUser!.id}');
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PresensiResultScreen(
+          user: _selectedUser!,
+          dateRange: _selectedDateRange!,
+        ),
+      ),
+    );
   }
 
   @override
@@ -77,239 +103,99 @@ class _AdminRiwayatScreenState extends State<AdminRiwayatScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
-          'Riwayat Presensi Admin',
+          'Riwayat Presensi',
           style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
         ),
       ),
-      body: Column(
-        children: [
-          // Filter dan Search
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              children: [
-                DropdownButtonFormField<String>(
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Search Karyawan
+            Autocomplete<UserModel>(
+              optionsBuilder: (TextEditingValue textEditingValue) {
+                if (textEditingValue.text.isEmpty) {
+                  return const Iterable<UserModel>.empty();
+                }
+                return _users.where((user) {
+                  return (user.displayName ?? '')
+                      .toLowerCase()
+                      .contains(textEditingValue.text.toLowerCase());
+                });
+              },
+              displayStringForOption: (UserModel user) =>
+                  user.displayName ?? 'Unknown',
+              onSelected: (UserModel user) {
+                print(
+                    'Selected user: {id: ${user.id}, displayName: ${user.displayName}}');
+                setState(() {
+                  _selectedUser = user;
+                  _searchController.text = user.displayName ?? '';
+                });
+              },
+              fieldViewBuilder:
+                  (context, controller, focusNode, onFieldSubmitted) {
+                return TextField(
+                  controller: controller,
+                  focusNode: focusNode,
                   decoration: const InputDecoration(
-                    labelText: 'Pilih User',
-                    border: OutlineInputBorder(),
-                  ),
-                  value: _selectedUserId,
-                  items: [
-                    const DropdownMenuItem<String>(
-                      value: null,
-                      child: Text('Semua User'),
-                    ),
-                    ..._users.map((user) => DropdownMenuItem<String>(
-                          value: user['id'],
-                          child: Text(user['name']),
-                        )),
-                  ],
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedUserId = value;
-                    });
-                  },
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: _searchController,
-                  decoration: const InputDecoration(
-                    labelText: 'Cari berdasarkan nama user',
+                    labelText: 'Cari Nama Karyawan',
                     border: OutlineInputBorder(),
                     prefixIcon: Icon(Icons.search),
                   ),
-                  onChanged: (value) => setState(() {}),
-                ),
-              ],
-            ),
-          ),
-          // List Riwayat
-          Expanded(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: _selectedUserId != null
-                  ? FirebaseFirestore.instance
-                      .collection('presensi')
-                      .where('user_id', isEqualTo: _selectedUserId)
-                      .orderBy('tanggal_presensi', descending: true)
-                      .snapshots()
-                  : FirebaseFirestore.instance
-                      .collection('presensi')
-                      .orderBy('tanggal_presensi', descending: true)
-                      .snapshots(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                if (snapshot.hasError) {
-                  return Center(child: Text('Error: ${snapshot.error}'));
-                }
-                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                  return const Center(
-                      child: Text('Tidak ada data riwayat presensi'));
-                }
-
-                // Kelompokkan data
-                final presensiDocs = snapshot.data!.docs;
-                Map<String, Map<String, List<Map<String, dynamic>>>>
-                    groupedPresensi = {};
-
-                for (var doc in presensiDocs) {
-                  final presensi = doc.data() as Map<String, dynamic>;
-                  final tanggalPresensi = presensi['tanggal_presensi'] ?? '';
-                  final userId = presensi['user_id'] ?? '';
-                  final user = _users.firstWhere(
-                    (u) => u['id'] == userId,
-                    orElse: () => {
-                      'name': 'Unknown',
-                      'email': '',
-                      'id': userId,
-                    },
-                  );
-
-                  // Filter berdasarkan search
-                  if (_searchController.text.isNotEmpty &&
-                      !user['name']
-                          .toLowerCase()
-                          .contains(_searchController.text.toLowerCase())) {
-                    continue;
-                  }
-
-                  if (!groupedPresensi.containsKey(tanggalPresensi)) {
-                    groupedPresensi[tanggalPresensi] = {};
-                  }
-                  if (!groupedPresensi[tanggalPresensi]!.containsKey(userId)) {
-                    groupedPresensi[tanggalPresensi]![userId] = [];
-                  }
-                  presensi['user_name'] = user['name'];
-                  groupedPresensi[tanggalPresensi]![userId]!.add(presensi);
-                }
-
-                final sortedDates = groupedPresensi.keys.toList()
-                  ..sort((a, b) {
-                    DateTime? dateA = _parseDate(a);
-                    DateTime? dateB = _parseDate(b);
-                    return dateB?.compareTo(dateA ?? DateTime.now()) ?? 0;
-                  });
-
-                return ListView.builder(
-                  padding: const EdgeInsets.all(16.0),
-                  itemCount: sortedDates.length,
-                  itemBuilder: (context, index) {
-                    final tanggalPresensi = sortedDates[index];
-                    final userPresensi = groupedPresensi[tanggalPresensi]!;
-
-                    DateTime? parsedDate = _parseDate(tanggalPresensi);
-                    final formattedDate = parsedDate != null
-                        ? DateFormat('EEEE, d MMMM yyyy', 'id_ID')
-                            .format(parsedDate)
-                        : tanggalPresensi;
-
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: userPresensi.keys.map((userId) {
-                        final presensiList = userPresensi[userId]!;
-                        final user = _users.firstWhere(
-                          (u) => u['id'] == userId,
-                          orElse: () => {
-                            'name': 'Unknown',
-                            'email': '',
-                            'id': userId,
-                          },
-                        );
-
-                        presensiList.sort((a, b) {
-                          final timeA = a['jam_presensi'] ?? '00:00:00';
-                          final timeB = b['jam_presensi'] ?? '00:00:00';
-                          return timeA.compareTo(timeB);
-                        });
-
-                        return Card(
-                          margin: const EdgeInsets.only(bottom: 16.0),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  '$formattedDate - ${user['name']}',
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                ...presensiList.map((presensi) {
-                                  final jamPresensi =
-                                      presensi['jam_presensi'] ?? '';
-                                  final locationName =
-                                      presensi['location_name'] ?? 'Unknown';
-                                  final type = presensi['type'] ?? '';
-                                  final userName =
-                                      presensi['user_name'] ?? 'Unknown';
-
-                                  return Padding(
-                                    padding: const EdgeInsets.only(bottom: 8.0),
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          type == 'Presensi Pulang'
-                                              ? LucideIcons.logOut
-                                              : LucideIcons.logIn,
-                                          color: type == 'Presensi Pulang'
-                                              ? Colors.red
-                                              : Colors.blue,
-                                          size: 20,
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                '$jamPresensi di $locationName',
-                                                style: const TextStyle(
-                                                    fontSize: 14),
-                                              ),
-                                              Text(
-                                                'User: $userName',
-                                                style: const TextStyle(
-                                                  fontSize: 12,
-                                                  color: Colors.grey,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                }),
-                              ],
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    );
-                  },
                 );
               },
             ),
-          ),
-        ],
+            const SizedBox(height: 16),
+            // Date Range Picker
+            InkWell(
+              onTap: () => _selectDateRange(context),
+              child: InputDecorator(
+                decoration: const InputDecoration(
+                  labelText: 'Rentang Tanggal',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.calendar_today),
+                ),
+                child: Text(
+                  _selectedDateRange == null
+                      ? 'Pilih rentang tanggal'
+                      : '${CustomDateUtils.DateUtils.formatDate(_selectedDateRange!.start, format: 'd MMM yyyy')} - '
+                          '${CustomDateUtils.DateUtils.formatDate(_selectedDateRange!.end, format: 'd MMM yyyy')}',
+                  style: TextStyle(
+                    color:
+                        _selectedDateRange == null ? Colors.grey : Colors.black,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            // Submit Button
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _onSubmit,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.amber[700],
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text(
+                  'Submit',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
-  }
-
-  DateTime? _parseDate(String dateStr) {
-    try {
-      return DateFormat('d MMM yyyy', 'id_ID').parse(dateStr);
-    } catch (e) {
-      return null;
-    }
   }
 
   @override

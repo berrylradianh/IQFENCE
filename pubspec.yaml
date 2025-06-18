@@ -30,6 +30,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
   firebase_core: ^3.14.0
   firebase_auth: ^5.6.0
   cloud_firestore: ^5.6.9
@@ -43,7 +45,6 @@ dependencies:
   lucide_icons: ^0.257.0
   path_provider: ^2.1.4
   permission_handler: ^11.3.1
-  intl: ^0.19.0
   google_maps_flutter: ^2.9.0
   camera: ^0.10.0
   http: ^1.2.2
@@ -51,7 +52,7 @@ dependencies:
   googleapis: ^13.2.0
   flutter_dotenv: ^5.1.0
   firebase_app_check: ^0.3.0
-  excel: ^2.0.0
+  excel: ^4.0.0
   pdf: ^3.8.0
   open_file: ^3.2.0
   rxdart: ^0.27.7
