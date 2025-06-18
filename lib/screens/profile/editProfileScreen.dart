@@ -91,18 +91,27 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     });
 
     try {
+      _showLoadingDialog(); // Show loader before starting upload
       final userId = _authService.currentUser?.uid ?? '';
       final webViewLink =
           await _googleDriveService.uploadImage(_imageFile!, userId);
-      if (!mounted) return;
+      if (!mounted) {
+        _hideLoadingDialog();
+        return;
+      }
       setState(() {
         _imageUrl = webViewLink;
       });
+      _hideLoadingDialog(); // Hide loader after successful upload
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Gambar berhasil diunggah: $webViewLink')),
       );
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted) {
+        _hideLoadingDialog();
+        return;
+      }
+      _hideLoadingDialog(); // Hide loader on error
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error mengunggah gambar: $e')),
       );
@@ -178,7 +187,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             children: [
               CircularProgressIndicator(),
               SizedBox(width: 20),
-              Text('Updating...'),
+              Text('Uploading...'),
             ],
           ),
         ),
