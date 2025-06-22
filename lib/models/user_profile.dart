@@ -9,7 +9,7 @@ class UserProfile {
   final String? role;
   final String? adminId;
   final String? karyawanId;
-  final String? jamKerja;
+  final Map<String, Map<String, dynamic>>? jamKerja;
   final List<String> locationIds;
 
   UserProfile({
@@ -39,7 +39,13 @@ class UserProfile {
       role: data['posisi'] as String?,
       adminId: data['admin_id'] as String?,
       karyawanId: data['karyawan_id'] as String?,
-      jamKerja: data['jam_kerja'] as String?,
+      jamKerja: data['jam_kerja'] != null
+          ? Map<String, Map<String, dynamic>>.from(
+              (data['jam_kerja'] as Map).map(
+                (key, value) => MapEntry(key, Map<String, dynamic>.from(value)),
+              ),
+            )
+          : null,
       locationIds: List<String>.from(data['location_ids'] ?? []),
     );
   }

@@ -1,6 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:iqfence/models/user_profile.dart'; // Added import for UserProfile
+import 'package:iqfence/models/user_profile.dart';
 import 'package:iqfence/providers/Auth.dart';
 import 'package:iqfence/providers/profileProvider.dart';
 import 'package:iqfence/screens/opening/hello_screen.dart';
