@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:iqfence/service/google_drive_service.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 class KelolaIzinScreen extends StatefulWidget {
@@ -13,6 +14,7 @@ class KelolaIzinScreen extends StatefulWidget {
 class _KelolaIzinScreenState extends State<KelolaIzinScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  final GoogleDriveService _googleDriveService = GoogleDriveService();
 
   @override
   void initState() {
@@ -165,6 +167,9 @@ class _KelolaIzinScreenState extends State<KelolaIzinScreen>
                                 _formatDate(izin['izinEndDate']);
                             final alasan = izin['izinReason'] ?? 'No alasan';
 
+                            final directImageUrl =
+                                _googleDriveService.getDirectImageUrl(fotoPath);
+
                             return Card(
                               margin: const EdgeInsets.only(bottom: 16),
                               shape: RoundedRectangleBorder(
@@ -208,8 +213,8 @@ class _KelolaIzinScreenState extends State<KelolaIzinScreen>
                                         ClipRRect(
                                           borderRadius:
                                               BorderRadius.circular(12),
-                                          child: Image.asset(
-                                            fotoPath,
+                                          child: Image.network(
+                                            directImageUrl,
                                             width: 60,
                                             height: 60,
                                             fit: BoxFit.cover,
@@ -385,6 +390,9 @@ class _KelolaIzinScreenState extends State<KelolaIzinScreen>
                                 _formatDate(izin['izinEndDate']);
                             final alasan = izin['izinReason'] ?? 'No alasan';
 
+                            final directImageUrl =
+                                _googleDriveService.getDirectImageUrl(fotoPath);
+
                             return Card(
                               margin: const EdgeInsets.only(bottom: 16),
                               shape: RoundedRectangleBorder(
@@ -428,8 +436,8 @@ class _KelolaIzinScreenState extends State<KelolaIzinScreen>
                                         ClipRRect(
                                           borderRadius:
                                               BorderRadius.circular(12),
-                                          child: Image.asset(
-                                            fotoPath,
+                                          child: Image.network(
+                                            directImageUrl,
                                             width: 60,
                                             height: 60,
                                             fit: BoxFit.cover,

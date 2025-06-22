@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:iqfence/service/google_drive_service.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 class KelolaLemburScreen extends StatefulWidget {
@@ -13,6 +14,7 @@ class KelolaLemburScreen extends StatefulWidget {
 class _KelolaLemburScreenState extends State<KelolaLemburScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  final GoogleDriveService _googleDriveService = GoogleDriveService();
 
   @override
   void initState() {
@@ -166,6 +168,9 @@ class _KelolaLemburScreenState extends State<KelolaLemburScreen>
                             final alasan =
                                 lembur['lemburReason'] ?? 'No alasan';
 
+                            final directImageUrl =
+                                _googleDriveService.getDirectImageUrl(fotoPath);
+
                             return Card(
                               margin: const EdgeInsets.only(bottom: 16),
                               shape: RoundedRectangleBorder(
@@ -209,8 +214,8 @@ class _KelolaLemburScreenState extends State<KelolaLemburScreen>
                                         ClipRRect(
                                           borderRadius:
                                               BorderRadius.circular(12),
-                                          child: Image.asset(
-                                            fotoPath,
+                                          child: Image.network(
+                                            directImageUrl,
                                             width: 60,
                                             height: 60,
                                             fit: BoxFit.cover,
@@ -388,6 +393,9 @@ class _KelolaLemburScreenState extends State<KelolaLemburScreen>
                             final alasan =
                                 lembur['lemburReason'] ?? 'No alasan';
 
+                            final directImageUrl =
+                                _googleDriveService.getDirectImageUrl(fotoPath);
+
                             return Card(
                               margin: const EdgeInsets.only(bottom: 16),
                               shape: RoundedRectangleBorder(
@@ -431,8 +439,8 @@ class _KelolaLemburScreenState extends State<KelolaLemburScreen>
                                         ClipRRect(
                                           borderRadius:
                                               BorderRadius.circular(12),
-                                          child: Image.asset(
-                                            fotoPath,
+                                          child: Image.network(
+                                            directImageUrl,
                                             width: 60,
                                             height: 60,
                                             fit: BoxFit.cover,
