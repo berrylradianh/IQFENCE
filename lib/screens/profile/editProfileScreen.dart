@@ -1,11 +1,13 @@
+import 'dart:convert';
 import 'dart:io';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:iqfence/components/custom_text_field.dart';
 import 'package:iqfence/providers/profileProvider.dart';
 import 'package:iqfence/service/auth_service.dart';
-import 'package:iqfence/service/google_drive_service.dart';
 import 'package:iqfence/utils/phone_normalizer.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -29,7 +31,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late TextEditingController _addressController;
   late TextEditingController _genderController;
   late TextEditingController _ageController;
-  final GoogleDriveService _googleDriveService = GoogleDriveService();
   final AuthService _authService = AuthService();
 
   @override
@@ -80,40 +81,117 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     return false;
   }
 
-  Future<void> _getImage() async {
-    if (!await _requestGalleryPermission()) return;
-    final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
-    if (pickedFile == null) return;
-    if (!mounted) return;
-
-    setState(() {
-      _imageFile = File(pickedFile.path);
-    });
-
+  Future<void> _uploadImage() async {
     try {
-      _showLoadingDialog(); // Show loader before starting upload
+      // Check user role first
       final userId = _authService.currentUser?.uid ?? '';
-      final webViewLink =
-          await _googleDriveService.uploadImage(_imageFile!, userId);
+      if (userId.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('User ID tidak ditemukan')),
+          );
+        }
+        return;
+      }
+
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .get();
+
+      if (!userDoc.exists || !mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Data pengguna tidak ditemukan')),
+        );
+        return;
+      }
+
+      final userRole = userDoc.data()?['role'] as String?;
+      if (userRole == 'admin') {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text('Admin tidak diizinkan mengganti foto profil')),
+          );
+        }
+        return;
+      }
+
+      if (!await _requestGalleryPermission()) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Izin galeri ditolak')),
+          );
+        }
+        return;
+      }
+
+      final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+      if (pickedFile == null || !mounted) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Pemilihan gambar dibatalkan')),
+          );
+        }
+        return;
+      }
+
+      setState(() {
+        _imageFile = File(pickedFile.path);
+      });
+
+      _showLoadingDialog();
+
+      final karyawanId = userDoc.data()?['karyawan_id'] as String?;
+      if (karyawanId == null || karyawanId.isEmpty) {
+        _hideLoadingDialog();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Karyawan ID tidak ditemukan')),
+          );
+        }
+        return;
+      }
+
+      final uri = Uri.parse('http://192.168.110.41:5000/upload');
+      var request = http.MultipartRequest('POST', uri)
+        ..fields['karyawan_id'] = karyawanId
+        ..files.add(await http.MultipartFile.fromPath('file', pickedFile.path));
+
+      final response = await request.send();
       if (!mounted) {
         _hideLoadingDialog();
         return;
       }
-      setState(() {
-        _imageUrl = webViewLink;
-      });
-      _hideLoadingDialog(); // Hide loader after successful upload
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gambar berhasil diunggah: $webViewLink')),
-      );
+
+      final responseData = await http.Response.fromStream(response);
+      final responseBody =
+          jsonDecode(responseData.body) as Map<String, dynamic>;
+
+      if (response.statusCode == 200 && !responseBody.containsKey('error')) {
+        setState(() {
+          _imageUrl = responseBody['url'] ?? responseData.body;
+        });
+        _hideLoadingDialog();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Foto profil berhasil diunggah')),
+        );
+      } else {
+        _hideLoadingDialog();
+        final errorMessage = responseBody['error'] ??
+            'Gagal mengunggah foto: ${response.statusCode}';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(errorMessage)),
+        );
+      }
     } catch (e) {
       if (!mounted) {
         _hideLoadingDialog();
         return;
       }
-      _hideLoadingDialog(); // Hide loader on error
+      _hideLoadingDialog();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error mengunggah gambar: $e')),
+        SnackBar(content: Text('Error mengunggah foto: $e')),
       );
     }
   }
@@ -187,7 +265,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             children: [
               CircularProgressIndicator(),
               SizedBox(width: 20),
-              Text('Uploading...'),
+              Text('Processing...'),
             ],
           ),
         ),
@@ -265,10 +343,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                   ),
                                   child: CircleAvatar(
                                     radius: 70,
-                                    backgroundImage: NetworkImage(
-                                      _googleDriveService
-                                          .getDirectImageUrl(_imageUrl!),
-                                    ),
+                                    backgroundImage: NetworkImage(_imageUrl!),
                                     onBackgroundImageError:
                                         (error, stackTrace) {
                                       debugPrint('Error loading image: $error');
@@ -295,7 +370,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         right: 0,
                         bottom: 0,
                         child: GestureDetector(
-                          onTap: _getImage,
+                          onTap: _uploadImage,
                           child: Container(
                             decoration: const BoxDecoration(
                               color: Colors.white,
@@ -418,8 +493,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   ),
                   onPressed: () async {
                     try {
-                      if (_passwordController.text.isNotEmpty ||
-                          _imageUrl != null) {
+                      if (_passwordController.text.isNotEmpty) {
                         if (!mounted) return;
                         if (!await _reauthenticateUser()) return;
                       }
