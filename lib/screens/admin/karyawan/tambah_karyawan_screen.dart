@@ -1,14 +1,6 @@
-import 'dart:io';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:googleapis/drive/v3.dart' as drive;
-import 'package:googleapis_auth/auth_io.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:iqfence/config/drive_config.dart';
-import 'package:permission_handler/permission_handler.dart';
 
 class TambahKaryawanScreen extends StatefulWidget {
   const TambahKaryawanScreen({super.key});
@@ -48,10 +40,16 @@ class _TambahKaryawanScreenState extends State<TambahKaryawanScreen> {
     'Sabtu': false,
     'Minggu': false,
   };
-  File? _selectedImage;
-  String? _imageUrl;
+  final Map<String, bool> _samaDenganHariSebelumnya = {
+    'Senin': false,
+    'Selasa': false,
+    'Rabu': false,
+    'Kamis': false,
+    'Jumat': false,
+    'Sabtu': false,
+    'Minggu': false,
+  };
   bool _isLoading = false;
-  final ImagePicker _picker = ImagePicker();
   List<Map<String, dynamic>> _locations = [];
   final List<String> _selectedLocationIds = [];
 
@@ -77,87 +75,6 @@ class _TambahKaryawanScreenState extends State<TambahKaryawanScreen> {
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error mengambil data lokasi: $e')),
-      );
-    }
-  }
-
-  Future<bool> _requestGalleryPermission() async {
-    final status = await Permission.photos.request();
-    if (status.isGranted) {
-      return true;
-    } else if (Platform.isAndroid) {
-      final storageStatus = await Permission.storage.request();
-      if (storageStatus.isGranted) {
-        return true;
-      }
-    }
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-          content: Text('Izin galeri diperlukan untuk memilih gambar')),
-    );
-    return false;
-  }
-
-  Future<void> _pickImage() async {
-    try {
-      final hasPermission = await _requestGalleryPermission();
-      if (!hasPermission) return;
-
-      final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
-      if (pickedFile != null) {
-        setState(() {
-          _selectedImage = File(pickedFile.path);
-        });
-
-        // Mengunggah ke Google Drive
-        final authClient = await clientViaServiceAccount(credentials, scopes);
-        final driveApi = drive.DriveApi(authClient);
-
-        final fileName =
-            'karyawan_${DateTime.now().millisecondsSinceEpoch}.jpg';
-        final driveFile = drive.File()
-          ..name = fileName
-          ..parents = [dotenv.env['GOOGLE_DRIVE_FOLDER_ID']!];
-
-        final fileContent = _selectedImage!.openRead();
-        final media = drive.Media(fileContent, _selectedImage!.lengthSync());
-
-        final uploadedFile = await driveApi.files.create(
-          driveFile,
-          uploadMedia: media,
-        );
-
-        // Mengatur izin publik
-        await driveApi.permissions.create(
-          drive.Permission()
-            ..type = 'anyone'
-            ..role = 'reader',
-          uploadedFile.id!,
-        );
-
-        // Mendapatkan URL publik
-        final fileInfo =
-            await driveApi.files.get(uploadedFile.id!, $fields: 'webViewLink');
-        final webViewLink = (fileInfo as drive.File).webViewLink;
-
-        setState(() {
-          _imageUrl = webViewLink;
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content:
-                Text('Gambar berhasil diunggah ke Google Drive: $webViewLink'),
-            duration: const Duration(seconds: 5),
-          ),
-        );
-        print('Gambar diunggah ke Google Drive: $webViewLink');
-
-        authClient.close();
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error mengunggah gambar: $e')),
       );
     }
   }
@@ -214,12 +131,11 @@ class _TambahKaryawanScreenState extends State<TambahKaryawanScreen> {
     if (nama.isEmpty ||
         alamat.isEmpty ||
         email.isEmpty ||
-        _imageUrl == null ||
         _selectedLocationIds.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
             content: Text(
-                'Nama, alamat, email, foto, dan minimal satu lokasi harus diisi')),
+                'Nama, alamat, email, dan minimal satu lokasi harus diisi')),
       );
       return;
     }
@@ -234,7 +150,7 @@ class _TambahKaryawanScreenState extends State<TambahKaryawanScreen> {
       return;
     }
 
-    if (!mounted) return; // Cek apakah widget masih mounted sebelum setState
+    if (!mounted) return;
     setState(() {
       _isLoading = true;
     });
@@ -243,24 +159,39 @@ class _TambahKaryawanScreenState extends State<TambahKaryawanScreen> {
       // Simpan email admin
       final adminEmail = user.email;
 
-      // Tambahkan data karyawan ke Firestore
-      final jamKerja = _jamMulai.keys.map((hari) => MapEntry(
-            hari,
-            {
-              'jam_mulai':
-                  _hariLibur[hari] == true ? '-' : _formatTime(_jamMulai[hari]),
-              'jam_selesai': _hariLibur[hari] == true
-                  ? '-'
-                  : _formatTime(_jamSelesai[hari]),
-              'libur': _hariLibur[hari] ?? false,
-            },
-          ));
+      // Proses jadwal kerja
+      final jamKerja = _jamMulai.keys.map((hari) {
+        bool isLibur = _hariLibur[hari] ?? false;
+        String jamMulai;
+        String jamSelesai;
 
+        if (isLibur) {
+          jamMulai = '-';
+          jamSelesai = '-';
+        } else if (_samaDenganHariSebelumnya[hari] == true) {
+          final hariSebelumnya = _getHariSebelumnya(hari);
+          jamMulai = _formatTime(_jamMulai[hariSebelumnya]);
+          jamSelesai = _formatTime(_jamSelesai[hariSebelumnya]);
+        } else {
+          jamMulai = _formatTime(_jamMulai[hari]);
+          jamSelesai = _formatTime(_jamSelesai[hari]);
+        }
+
+        return MapEntry(
+          hari,
+          {
+            'jam_mulai': jamMulai,
+            'jam_selesai': jamSelesai,
+            'libur': isLibur,
+          },
+        );
+      });
+
+      // Tambahkan data karyawan ke Firestore
       final karyawanDoc =
           await FirebaseFirestore.instance.collection('karyawan').add({
         'nama': nama,
         'alamat': alamat,
-        'foto': _imageUrl,
         'posisi': 'Karyawan',
         'jam_kerja': Map.fromEntries(jamKerja),
         'location_ids': _selectedLocationIds,
@@ -319,7 +250,20 @@ class _TambahKaryawanScreenState extends State<TambahKaryawanScreen> {
     }
   }
 
-// Fungsi untuk menampilkan dialog kata sandi
+  String _getHariSebelumnya(String hari) {
+    final hariList = [
+      'Senin',
+      'Selasa',
+      'Rabu',
+      'Kamis',
+      'Jumat',
+      'Sabtu',
+      'Minggu'
+    ];
+    final index = hariList.indexOf(hari);
+    return hariList[index == 0 ? hariList.length - 1 : index - 1];
+  }
+
   Future<String?> _showPasswordDialog(BuildContext context) async {
     final TextEditingController passwordController = TextEditingController();
     String? password;
@@ -375,6 +319,7 @@ class _TambahKaryawanScreenState extends State<TambahKaryawanScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              const SizedBox(height: 16),
               TextField(
                 controller: _namaController,
                 decoration: InputDecoration(
@@ -435,34 +380,6 @@ class _TambahKaryawanScreenState extends State<TambahKaryawanScreen> {
                         );
                       }).toList(),
                     ),
-              const SizedBox(height: 16),
-              GestureDetector(
-                onTap: _pickImage,
-                child: Container(
-                  height: 100,
-                  width: 100,
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: _selectedImage != null
-                      ? Image.file(
-                          _selectedImage!,
-                          fit: BoxFit.cover,
-                        )
-                      : const Icon(Icons.add_a_photo,
-                          size: 40, color: Colors.grey),
-                ),
-              ),
-              if (_imageUrl != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(
-                    'Gambar diunggah: $_imageUrl',
-                    style: const TextStyle(fontSize: 12),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
               const SizedBox(height: 24),
               const Text(
                 'Jadwal Kerja',
@@ -472,87 +389,134 @@ class _TambahKaryawanScreenState extends State<TambahKaryawanScreen> {
               ..._jamMulai.keys.map((hari) {
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 16.0),
-                  child: Row(
+                  child: Column(
                     children: [
-                      Expanded(
-                        flex: 2,
-                        child: Text(
-                          hari,
-                          style: const TextStyle(fontSize: 14),
-                        ),
+                      Row(
+                        children: [
+                          Expanded(
+                            flex: 2,
+                            child: Text(
+                              hari,
+                              style: const TextStyle(fontSize: 14),
+                            ),
+                          ),
+                          Expanded(
+                            flex: 3,
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: GestureDetector(
+                                    onTap: _hariLibur[hari] == true ||
+                                            _samaDenganHariSebelumnya[hari] ==
+                                                true
+                                        ? null
+                                        : () => _pickTime(hari, true),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 12, horizontal: 10),
+                                      decoration: BoxDecoration(
+                                        border: Border.all(color: Colors.grey),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Text(
+                                        _samaDenganHariSebelumnya[hari] == true
+                                            ? _formatTime(_jamMulai[
+                                                _getHariSebelumnya(hari)])
+                                            : _formatTime(_jamMulai[hari]),
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: _hariLibur[hari] == true ||
+                                                  _samaDenganHariSebelumnya[
+                                                          hari] ==
+                                                      true
+                                              ? Colors.grey
+                                              : Colors.black,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: GestureDetector(
+                                    onTap: _hariLibur[hari] == true ||
+                                            _samaDenganHariSebelumnya[hari] ==
+                                                true
+                                        ? null
+                                        : () => _pickTime(hari, false),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 12, horizontal: 10),
+                                      decoration: BoxDecoration(
+                                        border: Border.all(color: Colors.grey),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Text(
+                                        _samaDenganHariSebelumnya[hari] == true
+                                            ? _formatTime(_jamSelesai[
+                                                _getHariSebelumnya(hari)])
+                                            : _formatTime(_jamSelesai[hari]),
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: _hariLibur[hari] == true ||
+                                                  _samaDenganHariSebelumnya[
+                                                          hari] ==
+                                                      true
+                                              ? Colors.grey
+                                              : Colors.black,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Checkbox(
+                            value: _hariLibur[hari],
+                            onChanged: (value) {
+                              setState(() {
+                                _hariLibur[hari] = value ?? false;
+                                if (value == true) {
+                                  _jamMulai[hari] = null;
+                                  _jamSelesai[hari] = null;
+                                  _samaDenganHariSebelumnya[hari] = false;
+                                }
+                              });
+                            },
+                          ),
+                          const Text('Libur'),
+                        ],
                       ),
-                      Expanded(
-                        flex: 3,
-                        child: Row(
+                      if (hari != 'Senin')
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
                           children: [
-                            Expanded(
-                              child: GestureDetector(
-                                onTap: _hariLibur[hari] == true
-                                    ? null
-                                    : () => _pickTime(hari, true),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      vertical: 12, horizontal: 10),
-                                  decoration: BoxDecoration(
-                                    border: Border.all(color: Colors.grey),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Text(
-                                    _formatTime(_jamMulai[hari]),
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: _hariLibur[hari] == true
-                                          ? Colors.grey
-                                          : Colors.black,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ),
-                              ),
+                            Checkbox(
+                              value: _samaDenganHariSebelumnya[hari],
+                              onChanged: _hariLibur[hari] == true
+                                  ? null
+                                  : (value) {
+                                      setState(() {
+                                        _samaDenganHariSebelumnya[hari] =
+                                            value ?? false;
+                                        if (value == true) {
+                                          final hariSebelumnya =
+                                              _getHariSebelumnya(hari);
+                                          _jamMulai[hari] =
+                                              _jamMulai[hariSebelumnya];
+                                          _jamSelesai[hari] =
+                                              _jamSelesai[hariSebelumnya];
+                                        }
+                                      });
+                                    },
                             ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: GestureDetector(
-                                onTap: _hariLibur[hari] == true
-                                    ? null
-                                    : () => _pickTime(hari, false),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      vertical: 12, horizontal: 10),
-                                  decoration: BoxDecoration(
-                                    border: Border.all(color: Colors.grey),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Text(
-                                    _formatTime(_jamSelesai[hari]),
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: _hariLibur[hari] == true
-                                          ? Colors.grey
-                                          : Colors.black,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ),
-                              ),
-                            ),
+                            const Text('Sama dengan hari sebelumnya'),
                           ],
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Checkbox(
-                        value: _hariLibur[hari],
-                        onChanged: (value) {
-                          setState(() {
-                            _hariLibur[hari] = value ?? false;
-                            if (value == true) {
-                              _jamMulai[hari] = null;
-                              _jamSelesai[hari] = null;
-                            }
-                          });
-                        },
-                      ),
-                      const Text('Libur'),
                     ],
                   ),
                 );
