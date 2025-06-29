@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 
 class PresensiFotoScreen extends StatefulWidget {
@@ -213,6 +214,17 @@ class _PresensiFotoScreenState extends State<PresensiFotoScreen> {
       return;
     }
 
+    if (_imageFile == null) {
+      debugPrint('Foto belum diambil');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Foto belum diambil'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     debugPrint(
         'Current Position: ${_currentPosition!.latitude}, ${_currentPosition!.longitude}');
     final distance = Geolocator.distanceBetween(
@@ -290,11 +302,71 @@ class _PresensiFotoScreenState extends State<PresensiFotoScreen> {
         return;
       }
 
-      debugPrint('Karyawan ID: $karyawanId');
-      debugPrint('Menulis ke Firestore');
+      // Ambil data karyawan dari koleksi karyawan untuk mendapatkan URL foto
+      debugPrint('Mengambil data karyawan dari koleksi karyawan...');
+      DocumentSnapshot karyawanDoc = await FirebaseFirestore.instance
+          .collection('karyawan')
+          .doc(karyawanId)
+          .get();
+
+      if (!karyawanDoc.exists || karyawanDoc.data() == null) {
+        debugPrint('Data karyawan tidak ditemukan');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Data karyawan tidak ditemukan'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      Map<String, dynamic> karyawanData =
+          karyawanDoc.data() as Map<String, dynamic>;
+      String? fotoUrl = karyawanData['foto'];
+
+      if (fotoUrl == null) {
+        debugPrint('URL foto karyawan tidak ditemukan');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('URL foto karyawan tidak ditemukan'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      // Validasi foto dengan API
+      debugPrint('Memulai validasi foto dengan API...');
+      var request = http.MultipartRequest(
+        'POST',
+        Uri.parse('http://192.168.110.41:5000/presensi'),
+      );
+      request.files.add(
+        await http.MultipartFile.fromPath(
+          'file',
+          _imageFile!.path,
+        ),
+      );
+      request.fields['karyawan_id'] = karyawanId;
+
+      var response = await request.send();
+      debugPrint('Status kode API: ${response.statusCode}');
+
+      if (response.statusCode != 200) {
+        debugPrint('Validasi foto gagal');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Validasi foto gagal'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      debugPrint('Foto valid, menyimpan ke Firestore');
       await FirebaseFirestore.instance.collection('presensi').add({
-        'user_id': userId, // Mengganti karyawan_id menjadi user_id
-        'karyawan_id': karyawanId, // Menambahkan karyawan_id dari koleksi users
+        'user_id': userId,
+        'karyawan_id': karyawanId,
         'type': widget.isDatang ? 'Presensi Datang' : 'Presensi Pulang',
         'jam_presensi': jamPresensi,
         'tanggal_presensi': tanggalPresensi,
@@ -306,6 +378,21 @@ class _PresensiFotoScreenState extends State<PresensiFotoScreen> {
         'location_name': widget.locationName,
       });
       debugPrint('Data berhasil ditulis ke Firestore');
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              '${widget.isDatang ? 'Presensi Datang' : 'Presensi Pulang'} berhasil dicatat di ${widget.locationName}'),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      Navigator.pop(context, {
+        widget.isDatang ? 'datangTime' : 'pulangTime':
+            '$jamPresensi - $tanggalPresensi',
+        'locationName': widget.locationName,
+        'locationId': widget.locationId,
+      });
     } catch (e) {
       debugPrint('Error menyimpan presensi: $e');
       ScaffoldMessenger.of(context).showSnackBar(
@@ -314,23 +401,7 @@ class _PresensiFotoScreenState extends State<PresensiFotoScreen> {
           backgroundColor: Colors.red,
         ),
       );
-      return;
     }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-            '${widget.isDatang ? 'Presensi Datang' : 'Presensi Pulang'} berhasil dicatat di ${widget.locationName}'),
-        backgroundColor: Colors.green,
-      ),
-    );
-
-    Navigator.pop(context, {
-      widget.isDatang ? 'datangTime' : 'pulangTime':
-          '$jamPresensi - $tanggalPresensi',
-      'locationName': widget.locationName,
-      'locationId': widget.locationId,
-    });
   }
 
   @override
