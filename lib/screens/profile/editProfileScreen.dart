@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:iqfence/components/custom_text_field.dart';
@@ -153,7 +154,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         return;
       }
 
-      final uri = Uri.parse('http://192.168.110.41:5000/upload');
+      final uri = Uri.parse(
+          '${dotenv.env['API_HOST']}:${dotenv.env['API_PORT']}/upload');
       var request = http.MultipartRequest('POST', uri)
         ..fields['karyawan_id'] = karyawanId
         ..files.add(await http.MultipartFile.fromPath('file', pickedFile.path));

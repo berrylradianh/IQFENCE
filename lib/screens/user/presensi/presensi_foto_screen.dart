@@ -4,6 +4,7 @@ import 'package:camera/camera.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
@@ -339,7 +340,8 @@ class _PresensiFotoScreenState extends State<PresensiFotoScreen> {
       debugPrint('Memulai validasi foto dengan API...');
       var request = http.MultipartRequest(
         'POST',
-        Uri.parse('http://192.168.110.41:5000/presensi'),
+        Uri.parse(
+            '${dotenv.env['API_HOST']}:${dotenv.env['API_PORT']}/presensi'),
       );
       request.files.add(
         await http.MultipartFile.fromPath(
