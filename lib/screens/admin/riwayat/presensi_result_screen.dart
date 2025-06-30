@@ -1,8 +1,15 @@
+import 'dart:io';
+
+import 'package:excel/excel.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:iqfence/models/presensi_model.dart';
 import 'package:iqfence/models/userModel.dart';
 import 'package:iqfence/service/firestore_service.dart';
 import 'package:iqfence/utils/date_utils.dart' as CustomDateUtils;
+import 'package:open_file/open_file.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:pdf/widgets.dart' as pw;
 
 class PresensiResultScreen extends StatefulWidget {
   final UserModel user;
@@ -20,6 +27,7 @@ class PresensiResultScreen extends StatefulWidget {
 
 class _PresensiResultScreenState extends State<PresensiResultScreen> {
   final FirestoreService _firestoreService = FirestoreService();
+  String? _selectedExportFormat = 'PDF'; // Default export format
 
   @override
   void initState() {
@@ -32,6 +40,87 @@ class _PresensiResultScreenState extends State<PresensiResultScreen> {
           const SnackBar(content: Text('Error: User ID tidak tersedia')),
         );
       });
+    }
+  }
+
+  // Function to export to PDF
+  Future<void> _exportToPDF(List<Map<String, dynamic>> tableData) async {
+    final pdf = pw.Document();
+    pdf.addPage(
+      pw.MultiPage(
+        build: (pw.Context context) => [
+          pw.Header(
+            level: 0,
+            child: pw.Text(
+              'Hasil Riwayat Presensi - ${widget.user.displayName ?? 'Unknown'}',
+            ),
+          ),
+          pw.Text(
+            'Periode: ${CustomDateUtils.DateUtils.formatDate(widget.dateRange.start, format: 'd MMM yyyy')} - '
+            '${CustomDateUtils.DateUtils.formatDate(widget.dateRange.end, format: 'd MMM yyyy')}',
+          ),
+          pw.SizedBox(height: 20),
+          pw.Table.fromTextArray(
+            headers: ['Tanggal', 'Status', 'Lokasi'],
+            data: tableData
+                .map(
+                    (data) => [data['tanggal'], data['status'], data['lokasi']])
+                .toList(),
+          ),
+        ],
+      ),
+    );
+
+    final directory = await getTemporaryDirectory();
+    final fileName =
+        'Presensi_${widget.user.displayName?.replaceAll(' ', '_') ?? 'Unknown'}_${CustomDateUtils.DateUtils.formatDate(widget.dateRange.start, format: 'd_MMM_yyyy')}_to_${CustomDateUtils.DateUtils.formatDate(widget.dateRange.end, format: 'd_MMM_yyyy')}.pdf';
+    final file = File('${directory.path}/$fileName');
+    await file.writeAsBytes(await pdf.save());
+
+    if (!kIsWeb) {
+      await OpenFile.open(file.path);
+    } else {
+      // Handle web export (e.g., download the file)
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('PDF generated, please check downloads')),
+      );
+    }
+  }
+
+  // Function to export to Excel
+  Future<void> _exportToExcel(List<Map<String, dynamic>> tableData) async {
+    var excel = Excel.createExcel();
+    Sheet sheet = excel['Sheet1'];
+
+    // Add headers
+    sheet.cell(CellIndex.indexByString('A1')).value = TextCellValue('Tanggal');
+    sheet.cell(CellIndex.indexByString('B1')).value = TextCellValue('Status');
+    sheet.cell(CellIndex.indexByString('C1')).value = TextCellValue('Lokasi');
+
+    // Add data
+    for (var i = 0; i < tableData.length; i++) {
+      sheet.cell(CellIndex.indexByString('A${i + 2}')).value =
+          TextCellValue(tableData[i]['tanggal']);
+      sheet.cell(CellIndex.indexByString('B${i + 2}')).value =
+          TextCellValue(tableData[i]['status']);
+      sheet.cell(CellIndex.indexByString('C${i + 2}')).value =
+          TextCellValue(tableData[i]['lokasi']);
+    }
+
+    final directory = await getTemporaryDirectory();
+    final fileName =
+        'Presensi_${widget.user.displayName?.replaceAll(' ', '_') ?? 'Unknown'}_${CustomDateUtils.DateUtils.formatDate(widget.dateRange.start, format: 'd_MMM_yyyy')}_to_${CustomDateUtils.DateUtils.formatDate(widget.dateRange.end, format: 'd_MMM_yyyy')}.xlsx';
+    final file = File('${directory.path}/$fileName');
+    await file.writeAsBytes(excel.encode()!);
+
+    if (!kIsWeb) {
+      await OpenFile.open(file.path);
+    } else {
+      // Handle web export
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Excel generated, please check downloads')),
+      );
     }
   }
 
@@ -72,7 +161,105 @@ class _PresensiResultScreenState extends State<PresensiResultScreen> {
               '${CustomDateUtils.DateUtils.formatDate(widget.dateRange.end, format: 'd MMM yyyy')}',
               style: const TextStyle(fontSize: 14),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
+            // Export format selection and button
+            Row(
+              children: [
+                DropdownButton<String>(
+                  value: _selectedExportFormat,
+                  items: <String>['PDF', 'Excel']
+                      .map<DropdownMenuItem<String>>((String value) {
+                    return DropdownMenuItem<String>(
+                      value: value,
+                      child: Text(value),
+                    );
+                  }).toList(),
+                  onChanged: (String? newValue) {
+                    setState(() {
+                      _selectedExportFormat = newValue;
+                    });
+                  },
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(Icons.file_download, color: Colors.black),
+                  onPressed: () async {
+                    // Fetch tableData for export
+                    final snapshot = await _firestoreService
+                        .getPresensiStream(userId: widget.user.id!)
+                        .first;
+                    final presensiList = snapshot.where((presensi) {
+                      final date = CustomDateUtils.DateUtils.parseDate(
+                          presensi.tanggalPresensi);
+                      if (date == null) return false;
+                      return date.isAfter(widget.dateRange.start
+                              .subtract(const Duration(days: 1))) &&
+                          date.isBefore(widget.dateRange.end
+                              .add(const Duration(days: 1)));
+                    }).toList();
+
+                    final List<Map<String, dynamic>> tableData = [];
+                    var currentDate = widget.dateRange.start;
+                    while (currentDate.isBefore(
+                        widget.dateRange.end.add(const Duration(days: 1)))) {
+                      final formattedDate =
+                          CustomDateUtils.DateUtils.formatDate(currentDate,
+                              format: 'EEE, d MMMM yyyy');
+                      final presensiForDate = presensiList
+                          .where((p) =>
+                              p.tanggalPresensi ==
+                              CustomDateUtils.DateUtils.formatDate(currentDate,
+                                  format: 'd MMM yyyy'))
+                          .toList();
+
+                      String status = '-';
+                      String lokasi = '-';
+                      if (presensiForDate.isNotEmpty) {
+                        status = 'Hadir';
+                        final datang = presensiForDate.firstWhere(
+                          (p) => p.type == 'Presensi Datang',
+                          orElse: () => PresensiModel.empty(),
+                        );
+                        final pulang = presensiForDate.firstWhere(
+                          (p) => p.type == 'Presensi Pulang',
+                          orElse: () => PresensiModel.empty(),
+                        );
+
+                        List<String> lokasiParts = [];
+                        if (datang.locationName.isNotEmpty) {
+                          lokasiParts.add('Datang: ${datang.locationName}');
+                        }
+                        if (pulang.locationName.isNotEmpty) {
+                          lokasiParts.add('Pulang: ${pulang.locationName}');
+                        }
+                        lokasi = lokasiParts.join('\n');
+                      } else {
+                        if (currentDate.weekday == DateTime.saturday ||
+                            currentDate.weekday == DateTime.sunday) {
+                          status = 'Libur';
+                        }
+                      }
+
+                      tableData.add({
+                        'tanggal': formattedDate,
+                        'status': status,
+                        'lokasi': lokasi,
+                      });
+
+                      currentDate = currentDate.add(const Duration(days: 1));
+                    }
+
+                    // Export based on selected format
+                    if (_selectedExportFormat == 'PDF') {
+                      await _exportToPDF(tableData);
+                    } else if (_selectedExportFormat == 'Excel') {
+                      await _exportToExcel(tableData);
+                    }
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
 
             // Fixed Header
             Container(
