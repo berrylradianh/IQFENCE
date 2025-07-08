@@ -154,8 +154,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         return;
       }
 
-      final uri = Uri.parse(
-          '${dotenv.env['API_HOST']}:${dotenv.env['API_PORT']}/upload');
+      final uri = Uri.parse('${dotenv.env['API_HOST']}/upload');
       var request = http.MultipartRequest('POST', uri)
         ..fields['karyawan_id'] = karyawanId
         ..files.add(await http.MultipartFile.fromPath('file', pickedFile.path));

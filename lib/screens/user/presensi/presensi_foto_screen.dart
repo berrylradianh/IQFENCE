@@ -340,8 +340,7 @@ class _PresensiFotoScreenState extends State<PresensiFotoScreen> {
       debugPrint('Memulai validasi foto dengan API...');
       var request = http.MultipartRequest(
         'POST',
-        Uri.parse(
-            '${dotenv.env['API_HOST']}:${dotenv.env['API_PORT']}/presensi'),
+        Uri.parse('${dotenv.env['API_HOST']}/presensi'),
       );
       request.files.add(
         await http.MultipartFile.fromPath(
