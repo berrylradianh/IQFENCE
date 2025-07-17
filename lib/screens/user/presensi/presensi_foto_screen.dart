@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:camera/camera.dart';
@@ -364,7 +365,23 @@ class _PresensiFotoScreenState extends State<PresensiFotoScreen> {
         return;
       }
 
+      final responseBody = await response.stream.bytesToString();
+      final responseJson = jsonDecode(responseBody);
+      final photoUrlPresensi = responseJson['photo'];
+
+      if (photoUrlPresensi == null) {
+        debugPrint('URL foto presensi tidak ditemukan di response API');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Gagal mendapatkan URL foto presensi'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
       debugPrint('Foto valid, menyimpan ke Firestore');
+      debugPrint('URL foto presensi: $photoUrlPresensi');
       await FirebaseFirestore.instance.collection('presensi').add({
         'user_id': userId,
         'karyawan_id': karyawanId,
@@ -377,6 +394,7 @@ class _PresensiFotoScreenState extends State<PresensiFotoScreen> {
         },
         'location_id': widget.locationId,
         'location_name': widget.locationName,
+        'photo': photoUrlPresensi,
       });
       debugPrint('Data berhasil ditulis ke Firestore');
 
